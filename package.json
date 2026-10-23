@@ -1,0 +1,49 @@
+{
+  "name": "omo-preset",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Switch oh-my-opencode-slim presets from an OpenChamber panel without touching the rest of the config.",
+  "type": "module",
+  "openchamber": {
+    "apiVersion": 1,
+    "contributes": {
+      "panel": {
+        "id": "omo-preset",
+        "name": "Omo Preset",
+        "icon": "ai-agent",
+        "entry": "panel/index.html"
+      },
+      "statusSection": {
+        "entry": "panel/index.html",
+        "title": "Omo Preset",
+        "height": 180,
+        "defaultExpanded": true,
+        "requiresProject": false
+      },
+      "capabilities": [
+        "files"
+      ],
+      "filesystem": [
+        "~/.config/opencode/oh-my-opencode-slim.json",
+        "~/.config/opencode/oh-my-opencode-slim.jsonc"
+      ]
+    }
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "check:iife": "node scripts/check-iife.mjs",
+    "check:manifest": "node scripts/check-manifest.mjs",
+    "test": "node --test tests/config.test.ts",
+    "type-check": "tsc --noEmit",
+    "check": "npm run build && npm run check:iife && npm run check:manifest && npm run test"
+  },
+  "dependencies": {
+    "@openchamber/sdk": "2.5.0",
+    "jsonc-parser": "^3.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.9.0"
+  }
+}
