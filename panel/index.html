@@ -1,0 +1,253 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Omo Preset</title>
+    <style>
+      * { box-sizing: border-box; }
+      html, body { margin: 0; }
+      body {
+        background: transparent;
+        color: var(--oc-fg, #ddd);
+        font-family: var(--oc-font, system-ui, sans-serif);
+        font-size: 13px;
+        line-height: 1.45;
+        -webkit-font-smoothing: antialiased;
+      }
+      button { font: inherit; color: inherit; }
+      [hidden] { display: none !important; }
+      :focus-visible { outline: none; box-shadow: 0 0 0 2px var(--oc-focus, #6aa9ff); }
+
+      .panel {
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+        padding: 10px 12px 12px;
+        min-width: 0;
+      }
+      .head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        min-height: 20px;
+      }
+      .eyebrow {
+        font: 10px/1.2 var(--oc-mono, ui-monospace, monospace);
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--oc-muted, #999);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .icon-btn {
+        flex: none;
+        width: 22px;
+        height: 22px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        border: 0;
+        border-radius: 6px;
+        background: transparent;
+        color: var(--oc-muted, #999);
+        cursor: pointer;
+        font-size: 13px;
+        line-height: 1;
+      }
+      .icon-btn:hover:not(:disabled) { background: var(--oc-hover, rgba(127, 127, 127, 0.15)); color: var(--oc-fg, #ddd); }
+      .icon-btn:disabled { opacity: 0.5; cursor: default; }
+
+      .active-row { min-width: 0; }
+      .preset-trigger {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        width: 100%;
+        min-width: 0;
+        padding: 4px 6px;
+        border: 1px solid transparent;
+        border-radius: calc(var(--oc-radius, 8px) * 0.75);
+        background: transparent;
+        text-align: start;
+        cursor: pointer;
+        transition: background 120ms ease, border-color 120ms ease;
+      }
+      .preset-trigger:hover:not(:disabled) { background: var(--oc-hover, rgba(127, 127, 127, 0.15)); }
+      .preset-trigger[aria-expanded="true"] {
+        background: var(--oc-hover, rgba(127, 127, 127, 0.15));
+        border-color: var(--oc-border, rgba(127, 127, 127, 0.28));
+      }
+      .preset-trigger:disabled { opacity: 0.5; cursor: default; }
+      .preset-name {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .chevron {
+        flex: none;
+        color: var(--oc-muted, #999);
+        font-size: 10px;
+        line-height: 1;
+        width: 10px;
+        text-align: center;
+      }
+
+      .preset-list {
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+        padding: 3px;
+        border: 1px solid var(--oc-border, rgba(127, 127, 127, 0.28));
+        border-radius: calc(var(--oc-radius, 8px) * 0.75);
+        background: var(--oc-elevated, rgba(127, 127, 127, 0.06));
+      }
+      .preset-option {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        min-width: 0;
+        padding: 5px 7px;
+        border: 0;
+        border-radius: 5px;
+        background: transparent;
+        text-align: start;
+        cursor: pointer;
+      }
+      .preset-option:hover:not(:disabled),
+      .preset-option:focus-visible { background: var(--oc-hover, rgba(127, 127, 127, 0.15)); box-shadow: none; }
+      .preset-option[data-active="true"] {
+        background: var(--oc-selection, rgba(120, 160, 255, 0.2));
+        color: var(--oc-selection-fg, inherit);
+      }
+      .preset-option:disabled { opacity: 0.5; cursor: default; }
+      .option-label { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
+      .option-name { font-size: 12.5px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .option-model {
+        font: 10.5px/1.35 var(--oc-mono, ui-monospace, monospace);
+        color: var(--oc-muted, #999);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .preset-option[data-active="true"] .option-model { color: inherit; opacity: 0.75; }
+      .option-check { flex: none; font-size: 11px; color: var(--oc-primary, #6aa9ff); }
+      .preset-option[data-active="true"] .option-check { color: inherit; }
+
+      .agents {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        padding-top: 1px;
+      }
+      .agents-empty { font-size: 11px; color: var(--oc-muted, #999); }
+      .agent {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 10px;
+        min-width: 0;
+      }
+      .agent-name {
+        flex: none;
+        max-width: 42%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 11.5px;
+        color: var(--oc-muted, #999);
+      }
+      .agent-model {
+        display: flex;
+        align-items: baseline;
+        justify-content: flex-end;
+        gap: 5px;
+        min-width: 0;
+        font: 11px/1.4 var(--oc-mono, ui-monospace, monospace);
+        text-align: end;
+      }
+      .agent-model > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .variant {
+        flex: none;
+        padding: 0 5px;
+        border: 1px solid var(--oc-border, rgba(127, 127, 127, 0.28));
+        border-radius: 999px;
+        color: var(--oc-muted, #999);
+        font: 10px/1.6 var(--oc-mono, ui-monospace, monospace);
+      }
+
+      .layers {
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+        margin-top: 1px;
+        padding-top: 6px;
+        border-top: 1px solid var(--oc-border, rgba(127, 127, 127, 0.28));
+      }
+      .layer {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 10px;
+        min-width: 0;
+        font-size: 11px;
+        color: var(--oc-muted, #999);
+      }
+      .layer strong {
+        min-width: 0;
+        max-width: 62%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-weight: 500;
+        color: var(--oc-fg, #ddd);
+      }
+      .layer strong.is-empty { color: var(--oc-muted, #999); font-weight: 400; }
+
+      .hint {
+        margin: 0;
+        font-size: 11px;
+        line-height: 1.45;
+        color: var(--oc-muted, #999);
+      }
+
+      .confirm {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 10px;
+        border: 1px solid var(--oc-border, rgba(127, 127, 127, 0.28));
+        border-radius: calc(var(--oc-radius, 8px) * 0.9);
+        background: var(--oc-muted-surface, rgba(127, 127, 127, 0.08));
+      }
+      .confirm-title { font-size: 13px; font-weight: 600; }
+      .confirm-body { font-size: 11.5px; line-height: 1.5; color: var(--oc-muted, #999); overflow-wrap: anywhere; }
+      .confirm-body code {
+        padding: 0 3px;
+        border-radius: 3px;
+        background: var(--oc-bg, transparent);
+        color: var(--oc-fg, #ddd);
+        font: 10.5px var(--oc-mono, ui-monospace, monospace);
+      }
+      .confirm-hint { font-size: 11px; line-height: 1.45; color: var(--oc-info-text, var(--oc-muted, #999)); }
+      .confirm-actions { display: flex; justify-content: flex-end; gap: 6px; }
+
+      .loading { padding: 8px 2px; }
+
+      @media (prefers-reduced-motion: reduce) {
+        * { transition: none !important; }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script src="main.js"></script>
+  </body>
+</html>
