@@ -441,16 +441,18 @@ const applyPreset = async (name: string): Promise<void> => {
   const layers = await readLayers(directory);
   if (layers.status === 'failed') {
     interaction = { kind: 'browse' };
-    notice = { tone: 'error', title: 'Preset wurde nicht geändert', body: layers.detail };
-    screen = { kind: 'ready', model };
+    screen = {
+      kind: 'failed',
+      title: 'Preset wurde nicht geändert',
+      detail: `${layers.title}: ${layers.detail}`,
+    };
     paint();
     return;
   }
   const resolved = resolvePresetView(layers.global, layers.project);
   if (!resolved.ok) {
     interaction = { kind: 'browse' };
-    notice = { tone: 'error', title: 'Preset wurde nicht geändert', body: resolved.error };
-    screen = { kind: 'ready', model };
+    screen = { kind: 'failed', title: 'Preset wurde nicht geändert', detail: resolved.error };
     paint();
     return;
   }
@@ -493,8 +495,11 @@ const applyPreset = async (name: string): Promise<void> => {
   const source = target.kind === 'project' ? layers.project : layers.global;
   if (!source) {
     interaction = { kind: 'browse' };
-    notice = { tone: 'error', title: 'Preset wurde nicht geändert', body: `${target.path} wurde nicht gefunden.` };
-    screen = { kind: 'ready', model };
+    screen = {
+      kind: 'failed',
+      title: 'Preset wurde nicht geändert',
+      detail: `${target.path} wurde nicht gefunden.`,
+    };
     paint();
     return;
   }
