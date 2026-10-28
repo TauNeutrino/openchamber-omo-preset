@@ -21,7 +21,8 @@
         "requiresProject": false
       },
       "capabilities": [
-        "files"
+        "files",
+        "sessions"
       ],
       "filesystem": [
         "~/.config/opencode/oh-my-opencode-slim.json",
@@ -33,12 +34,12 @@
     "build": "node build.mjs",
     "check:iife": "node scripts/check-iife.mjs",
     "check:manifest": "node scripts/check-manifest.mjs",
-    "test": "node --test tests/config.test.ts",
+    "test": "node --test tests/*.test.ts",
     "type-check": "tsc --noEmit",
     "check": "npm run build && npm run check:iife && npm run check:manifest && npm run test"
   },
   "dependencies": {
-    "@openchamber/sdk": "2.5.0",
+    "@openchamber/sdk": "^2.5.2",
     "jsonc-parser": "^3.3.1"
   },
   "devDependencies": {

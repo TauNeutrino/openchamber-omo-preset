@@ -1,4 +1,4 @@
-import { connectHost, HostRequestError, type HostReadyContext } from '@openchamber/sdk';
+import { connectHost, HostRequestError, type GuestProject, type HostReadyContext } from '@openchamber/sdk';
 import {
   applyHostReady,
   mountBadge,
@@ -21,6 +21,7 @@ import {
   type PresetView,
   type WriteTarget,
 } from './config.ts';
+import { groupActiveSessions, sameDirectory, type AgentSession } from './sessions.ts';
 
 // The extension can see the global omo-slim config through the manifest's
 // filesystem globs. The project override is a relative path, which the host
@@ -77,6 +78,14 @@ let notice: Notice | null = null;
 let loadToken = 0;
 let heightFrame = 0;
 let mounted: Array<{ dispose: () => void }> = [];
+let activeSessions = new Map<string, AgentSession[]>();
+let openAgent: string | undefined;
+let sessionsToken = 0;
+let projectLookupToken = 0;
+let stopProjects: (() => void) | null = null;
+let stopSessions: (() => void) | null = null;
+let subscribedProject: string | null = null;
+let subscriptionToken = 0;
 
 const element = <K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -185,14 +194,64 @@ const paintBanner = (parent: Element, value: Notice): void => {
 };
 
 const agentRow = (agent: PresetAgent): HTMLElement => {
+  const key = agent.agent;
+  const name = agent.agent;
+  const group = element('div', 'agent-group');
   const row = element('div', 'agent');
-  row.append(element('span', 'agent-name', agent.agent));
+  const sessions = activeSessions.get(key) ?? [];
+  if (sessions.length) {
+    const trigger = element('button', 'agent-disclosure');
+    trigger.type = 'button';
+    trigger.dataset.agent = key;
+    trigger.setAttribute('aria-expanded', String(openAgent === key));
+    trigger.setAttribute('aria-label', `${name}: ${sessions.length} aktive Sessions`);
+    const count = element('span', 'session-count', ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '⑩'][Math.min(sessions.length, 10) - 1]);
+    if (sessions.length > 10) count.append(element('sup', '', '+'));
+    trigger.append(count, element('span', 'agent-name', name), element('span', 'agent-chevron', openAgent === key ? '▴' : '▾'));
+    trigger.addEventListener('click', () => {
+      openAgent = openAgent === key ? undefined : key;
+      paint();
+    });
+    row.append(trigger);
+  } else {
+    row.append(element('span', 'agent-name', name));
+  }
   const value = element('span', 'agent-model');
-  value.append(element('span', '', agent.model));
-  if (agent.variant) value.append(element('span', 'variant', agent.variant));
+  const model = element('span', 'model-text');
+  model.append(element('span', 'model-content', agent.model));
+  value.append(model);
+  if (agent.variant) {
+    const variant = element('span', 'variant');
+    variant.append(element('span', 'model-content', agent.variant));
+    value.append(variant);
+  }
   value.title = `${agent.agent} · ${agent.model}${agent.variant ? ` (${agent.variant})` : ''}`;
   row.append(value);
-  return row;
+  group.append(row);
+  if (sessions.length && openAgent === key) {
+    const list = element('div', 'session-list');
+    list.setAttribute('aria-label', `Aktive Sessions: ${name}`);
+    for (const session of sessions) {
+      const option = element('button', 'session-option');
+      option.type = 'button';
+      option.dataset.session = session.id;
+      const label = element('span', 'session-title', session.title || 'Session ohne Titel');
+      option.title = session.title;
+      option.append(label);
+      const activity = session.activity === 'waiting-permission' ? 'Warten auf Freigabe'
+        : session.activity === 'waiting-question' ? 'Warten auf Antwort'
+          : session.activity === 'retrying' ? 'Erneuter Versuch' : '';
+      if (activity) option.append(element('span', 'session-activity', activity));
+      option.addEventListener('click', () => {
+        void host.openSession(session.id).catch((error: unknown) => {
+          void host.toast({ kind: 'error', message: `Session konnte nicht geöffnet werden: ${errorText(error)}` }).catch(() => undefined);
+        });
+      });
+      list.append(option);
+    }
+    group.append(list);
+  }
+  return group;
 };
 
 const layerRow = (label: string, value: string | null, path: string | undefined, muted: boolean): HTMLElement => {
@@ -379,13 +438,86 @@ const paintFailed = (panel: HTMLElement, failed: Extract<Screen, { kind: 'failed
 };
 
 const paint = (): void => {
+  const focused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  const focusedAgent = focused?.dataset.agent;
+  const focusedSession = focused?.dataset.session;
   clearMounted();
   const panel = element('div', 'panel');
   if (screen.kind === 'loading') paintLoading(panel);
   else if (screen.kind === 'failed') paintFailed(panel, screen);
   else paintReady(panel, screen.model);
   root.append(panel);
+  if (focusedAgent) [...root.querySelectorAll<HTMLElement>('.agent-disclosure')].find((item) => item.dataset.agent === focusedAgent)?.focus();
+  else if (focusedSession) [...root.querySelectorAll<HTMLElement>('.session-option')].find((item) => item.dataset.session === focusedSession)?.focus();
   scheduleHeight();
+};
+
+// Directory changes can race both project lookup and the asynchronous SDK
+// subscription handshake. Tokens keep late snapshots and unsubscriptions scoped.
+const watchSessions = (currentDirectory: string | null): void => {
+  const token = ++sessionsToken;
+  ++projectLookupToken;
+  stopProjects?.(); stopProjects = null;
+  stopSessions?.(); stopSessions = null;
+  ++subscriptionToken;
+  subscribedProject = null;
+  activeSessions = new Map();
+  openAgent = undefined;
+  if (!currentDirectory) return;
+
+  const selectProject = async (projects: GuestProject[]): Promise<void> => {
+    const lookup = ++projectLookupToken;
+    let project = projects.find((item) => sameDirectory(item.directory, currentDirectory));
+    if (!project) {
+      const trees = await Promise.all(projects.map(async (item) => {
+        try { return { item, snapshot: await host.listWorktrees(item.id) }; }
+        catch { return null; }
+      }));
+      project = trees.find((result) => result?.snapshot.worktrees.some((tree) => sameDirectory(tree.directory, currentDirectory)))?.item;
+    }
+    if (token !== sessionsToken || lookup !== projectLookupToken) return;
+    const projectId = project?.id ?? null;
+    if (projectId === subscribedProject) return;
+    stopSessions?.(); stopSessions = null;
+    const subscription = ++subscriptionToken;
+    subscribedProject = projectId;
+    activeSessions = new Map();
+    openAgent = undefined;
+    paint();
+    if (!projectId) return;
+    try {
+      const unsubscribe = await host.onSessions(projectId, (snapshot) => {
+        if (token !== sessionsToken || subscription !== subscriptionToken || subscribedProject !== projectId || snapshot.projectId !== projectId) return;
+        const next = groupActiveSessions(snapshot.sessions as AgentSession[], projectId, currentDirectory);
+        // Avoid stealing focus on unchanged host updates.
+        const signature = (groups: Map<string, AgentSession[]>): string => JSON.stringify([...groups].map(([name, entries]) => [name, entries.map((entry) => [entry.id, entry.title, entry.activity])]));
+        if (signature(next) === signature(activeSessions)) return;
+        activeSessions = next;
+        if (openAgent !== undefined && !next.has(openAgent)) openAgent = undefined;
+        // A live update must not reset focus in the preset picker or confirmation.
+        // Those views repaint from the latest snapshot when they close.
+        if (!listOpen && interaction.kind === 'browse') paint();
+      });
+      if (token !== sessionsToken || subscription !== subscriptionToken || subscribedProject !== projectId) unsubscribe();
+      else stopSessions = unsubscribe;
+    } catch {
+      if (token === sessionsToken && subscription === subscriptionToken && subscribedProject === projectId) subscribedProject = null;
+    }
+  };
+
+  let receivedProjects = false;
+  void host.onProjects((snapshot) => {
+    if (token === sessionsToken && snapshot.state === 'ready') {
+      receivedProjects = true;
+      void selectProject(snapshot.projects);
+    }
+  }).then((unsubscribe) => {
+    if (token !== sessionsToken) unsubscribe();
+    else stopProjects = unsubscribe;
+  }).catch(() => undefined);
+  void host.listProjects().then((snapshot) => {
+    if (token === sessionsToken && !receivedProjects && snapshot.state === 'ready') void selectProject(snapshot.projects);
+  }).catch(() => undefined);
 };
 
 const loadAndPaint = async (): Promise<void> => {
@@ -530,6 +662,9 @@ document.addEventListener('keydown', (event) => {
   } else if (listOpen) {
     listOpen = false;
     paint();
+  } else if (openAgent !== undefined) {
+    openAgent = undefined;
+    paint();
   }
 });
 
@@ -552,11 +687,13 @@ host.onReady((ctx) => {
   if (!didMount) {
     didMount = true;
     directory = nextDirectory;
+    watchSessions(directory);
     void loadAndPaint();
     return;
   }
   if (nextDirectory !== directory) {
     directory = nextDirectory;
+    watchSessions(directory);
     void loadAndPaint();
   }
 });
@@ -564,5 +701,6 @@ host.onReady((ctx) => {
 host.onDirectory((next) => {
   if (!didMount || next === directory) return;
   directory = next;
+  watchSessions(directory);
   void loadAndPaint();
 });

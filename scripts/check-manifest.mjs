@@ -60,5 +60,8 @@ for (const pattern of filesystem) {
 if (!manifest.contributes.capabilities?.includes('files')) {
   throw new Error('Project-relative reads need the "files" capability.');
 }
+if (!manifest.contributes.capabilities?.includes('sessions')) {
+  throw new Error('Opening sessions needs the "sessions" capability.');
+}
 
 console.log(`Manifest ok: apiVersion ${manifest.apiVersion}, panel ${panel.id}, ${filesystem.length} filesystem patterns, entries ${[...entries].join(', ')}.`);
