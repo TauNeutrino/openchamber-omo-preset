@@ -1,4 +1,4 @@
-import { connectHost, HostRequestError, type GuestProject, type HostReadyContext } from '@openchamber/sdk';
+import { connectHost, HostRequestError, type GuestProject, type GuestSessionRecord, type HostReadyContext, type SessionSnapshot } from '@openchamber/sdk';
 import {
   applyHostReady,
   mountBadge,
@@ -21,7 +21,7 @@ import {
   type PresetView,
   type WriteTarget,
 } from './config.ts';
-import { groupActiveSessions, sameDirectory, type AgentSession } from './sessions.ts';
+import { buildSessionTree, groupActiveSessions, sameDirectory, type AgentSession, type SessionTreeNode } from './sessions.ts';
 
 // The extension can see the global omo-slim config through the manifest's
 // filesystem globs. The project override is a relative path, which the host
@@ -79,6 +79,10 @@ let loadToken = 0;
 let heightFrame = 0;
 let mounted: Array<{ dispose: () => void }> = [];
 let activeSessions = new Map<string, AgentSession[]>();
+let currentSession: SessionSnapshot | null = null;
+let workspaceSessions: GuestSessionRecord[] = [];
+let treeOpen = false;
+const collapsedTreeNodes = new Set<string>();
 let openAgent: string | undefined;
 let sessionsToken = 0;
 let projectLookupToken = 0;
@@ -254,6 +258,111 @@ const agentRow = (agent: PresetAgent): HTMLElement => {
   return group;
 };
 
+const relativeTime = (timestamp: number): string => {
+  const minutes = Math.max(0, Math.floor((Date.now() - timestamp) / 60_000));
+  if (minutes < 1) return 'gerade eben';
+  if (minutes < 60) return `vor ${minutes} Min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `vor ${hours} Std`;
+  return `vor ${Math.floor(hours / 24)} Tagen`;
+};
+
+const openSession = (id: string): void => {
+  void host.openSession(id).catch((error: unknown) => {
+    void host.toast({ kind: 'error', message: `Session konnte nicht geöffnet werden: ${errorText(error)}` }).catch(() => undefined);
+  });
+};
+
+const treeNode = (node: SessionTreeNode, isRoot: boolean, depth = 0): HTMLElement => {
+  const item = element('li', 'tree-item');
+  const row = element('div', 'tree-row');
+  if (node.children.length) {
+    const expanded = !collapsedTreeNodes.has(node.id);
+    const disclosure = element('button', 'tree-disclosure', expanded ? '▾' : '▸');
+    disclosure.type = 'button';
+    disclosure.dataset.treeToggle = node.id;
+    disclosure.setAttribute('aria-expanded', String(expanded));
+    disclosure.setAttribute('aria-label', `${node.title || node.id.slice(0, 8)}: ${node.children.length} direkte Subsessions ${expanded ? 'einklappen' : 'ausklappen'}`);
+    disclosure.addEventListener('click', () => {
+      if (expanded) collapsedTreeNodes.add(node.id);
+      else collapsedTreeNodes.delete(node.id);
+      paint();
+    });
+    row.append(disclosure);
+  } else {
+    const spacer = element('span', 'tree-disclosure-spacer');
+    spacer.setAttribute('aria-hidden', 'true');
+    row.append(spacer);
+  }
+
+  const button = element('button', 'tree-session');
+  button.type = 'button';
+  button.dataset.treeSession = node.id;
+  const title = node.title.trim() || node.id.slice(0, 8);
+  button.title = `${title}${node.record ? ` · ${relativeTime(node.record.updatedAt)}` : ''}`;
+  const headline = element('span', 'tree-headline');
+  headline.append(element('span', 'tree-title', title));
+  if (node.children.length) {
+    const count = element('span', 'tree-child-count', String(node.children.length));
+    count.setAttribute('aria-label', `${node.children.length} direkte Subsessions`);
+    headline.append(count);
+  }
+  button.append(headline);
+
+  const recordActivity = node.record?.activity ?? 'unknown';
+  const activity = isRoot && currentSession?.busy && (recordActivity === 'unknown' || recordActivity === 'idle')
+    ? 'running' : recordActivity;
+  const status = activity === 'running' ? 'Läuft'
+    : activity === 'retrying' ? 'Wiederholung'
+      : activity === 'waiting-permission' ? 'Warten auf Freigabe'
+        : activity === 'waiting-question' ? 'Warten auf Antwort' : '';
+  const outcome = node.record?.outcome === 'completed' ? '✓ Abgeschlossen'
+    : node.record?.outcome === 'failed' ? '× Fehlgeschlagen' : '';
+  const metadata = isRoot ? [currentSession?.agent, currentSession?.model].filter(Boolean).join(' · ') : '';
+  if (status || outcome || metadata) {
+    const details = element('span', 'tree-details');
+    if (status) {
+      const state = element('span', activity === 'running' ? 'tree-state is-live' : 'tree-state', status);
+      details.append(state);
+    }
+    if (outcome) details.append(element('span', 'tree-outcome', outcome));
+    if (metadata) details.append(element('span', 'tree-metadata', metadata));
+    button.append(details);
+  }
+  button.addEventListener('click', () => openSession(node.id));
+  row.append(button);
+  item.append(row);
+  if (node.children.length && !collapsedTreeNodes.has(node.id)) {
+    const children = element('ul', depth >= 5 ? 'tree-children is-deep' : 'tree-children');
+    for (const child of node.children) children.append(treeNode(child, false, depth + 1));
+    item.append(children);
+  }
+  return item;
+};
+
+const paintSessionTree = (panel: HTMLElement): void => {
+  const tree = buildSessionTree(currentSession, workspaceSessions);
+  if (!tree) return;
+  const section = element('section', 'tree-section');
+  const trigger = element('button', 'tree-section-trigger');
+  trigger.type = 'button';
+  trigger.dataset.treeSection = 'true';
+  trigger.setAttribute('aria-expanded', String(treeOpen));
+  trigger.setAttribute('aria-controls', 'omo-session-tree');
+  trigger.append(element('span', '', 'Aktuelle Session'), element('span', 'chevron', treeOpen ? '▴' : '▾'));
+  trigger.addEventListener('click', () => {
+    treeOpen = !treeOpen;
+    paint();
+  });
+  section.append(trigger);
+  const list = element('ul', 'tree-list');
+  list.id = 'omo-session-tree';
+  list.hidden = !treeOpen;
+  if (treeOpen) list.append(treeNode(tree, true));
+  section.append(list);
+  panel.append(section);
+};
+
 const layerRow = (label: string, value: string | null, path: string | undefined, muted: boolean): HTMLElement => {
   const row = element('div', 'layer');
   row.append(element('span', 'layer-label', label));
@@ -412,6 +521,7 @@ const paintReady = (panel: HTMLElement, model: ReadyModel): void => {
   }
   panel.append(layers);
 
+  paintSessionTree(panel);
   panel.append(element('p', 'hint', RESTART_HINT));
 };
 
@@ -441,14 +551,27 @@ const paint = (): void => {
   const focused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   const focusedAgent = focused?.dataset.agent;
   const focusedSession = focused?.dataset.session;
+  const focusedTreeSession = focused?.dataset.treeSession;
+  const focusedTreeToggle = focused?.dataset.treeToggle;
+  const focusedTreeSection = focused?.dataset.treeSection === 'true';
+  const treeScroll = root.querySelector<HTMLElement>('.tree-list')?.scrollTop ?? 0;
   clearMounted();
   const panel = element('div', 'panel');
-  if (screen.kind === 'loading') paintLoading(panel);
-  else if (screen.kind === 'failed') paintFailed(panel, screen);
-  else paintReady(panel, screen.model);
+  if (screen.kind === 'loading') {
+    paintLoading(panel);
+    paintSessionTree(panel);
+  } else if (screen.kind === 'failed') {
+    paintFailed(panel, screen);
+    paintSessionTree(panel);
+  } else paintReady(panel, screen.model);
   root.append(panel);
+  const treeList = root.querySelector<HTMLElement>('.tree-list');
+  if (treeList) treeList.scrollTop = treeScroll;
   if (focusedAgent) [...root.querySelectorAll<HTMLElement>('.agent-disclosure')].find((item) => item.dataset.agent === focusedAgent)?.focus();
   else if (focusedSession) [...root.querySelectorAll<HTMLElement>('.session-option')].find((item) => item.dataset.session === focusedSession)?.focus();
+  else if (focusedTreeSection) root.querySelector<HTMLElement>('.tree-section-trigger')?.focus();
+  else if (focusedTreeToggle) [...root.querySelectorAll<HTMLElement>('.tree-disclosure')].find((item) => item.dataset.treeToggle === focusedTreeToggle)?.focus();
+  else if (focusedTreeSession) [...root.querySelectorAll<HTMLElement>('.tree-session')].find((item) => item.dataset.treeSession === focusedTreeSession)?.focus();
   scheduleHeight();
 };
 
@@ -462,6 +585,8 @@ const watchSessions = (currentDirectory: string | null): void => {
   ++subscriptionToken;
   subscribedProject = null;
   activeSessions = new Map();
+  workspaceSessions = [];
+  collapsedTreeNodes.clear();
   openAgent = undefined;
   if (!currentDirectory) return;
 
@@ -482,17 +607,22 @@ const watchSessions = (currentDirectory: string | null): void => {
     const subscription = ++subscriptionToken;
     subscribedProject = projectId;
     activeSessions = new Map();
+    workspaceSessions = [];
     openAgent = undefined;
     paint();
     if (!projectId) return;
     try {
       const unsubscribe = await host.onSessions(projectId, (snapshot) => {
         if (token !== sessionsToken || subscription !== subscriptionToken || subscribedProject !== projectId || snapshot.projectId !== projectId) return;
-        const next = groupActiveSessions(snapshot.sessions as AgentSession[], projectId, currentDirectory);
+        const records = snapshot.sessions.filter((session) => session.projectId === projectId);
+        const next = groupActiveSessions(records as AgentSession[], projectId, currentDirectory);
         // Avoid stealing focus on unchanged host updates.
         const signature = (groups: Map<string, AgentSession[]>): string => JSON.stringify([...groups].map(([name, entries]) => [name, entries.map((entry) => [entry.id, entry.title, entry.activity])]));
-        if (signature(next) === signature(activeSessions)) return;
+        const treeSignature = (sessions: GuestSessionRecord[]): string => JSON.stringify(sessions.map((session) => [session.id, session.title, session.parentId, session.archivedAt, session.activity, session.outcome, session.updatedAt]));
+        const unchanged = signature(next) === signature(activeSessions) && treeSignature(records) === treeSignature(workspaceSessions);
         activeSessions = next;
+        workspaceSessions = records;
+        if (unchanged) return;
         if (openAgent !== undefined && !next.has(openAgent)) openAgent = undefined;
         // A live update must not reset focus in the preset picker or confirmation.
         // Those views repaint from the latest snapshot when they close.
@@ -703,4 +833,11 @@ host.onDirectory((next) => {
   directory = next;
   watchSessions(directory);
   void loadAndPaint();
+});
+
+host.onSession((next) => {
+  if (JSON.stringify(next) === JSON.stringify(currentSession)) return;
+  if (next?.id !== currentSession?.id) collapsedTreeNodes.clear();
+  currentSession = next;
+  if (didMount && !listOpen && interaction.kind === 'browse') paint();
 });

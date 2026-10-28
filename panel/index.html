@@ -243,6 +243,72 @@
       .session-title { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
       .session-activity { color: var(--oc-muted, #999); font-size: 10.5px; }
 
+      .tree-section {
+        min-width: 0;
+        padding-top: 5px;
+        border-top: 1px solid var(--oc-border, rgba(127, 127, 127, 0.28));
+      }
+      .tree-section-trigger {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        width: 100%;
+        min-height: 24px;
+        padding: 3px 4px;
+        border: 0;
+        border-radius: 5px;
+        background: transparent;
+        color: var(--oc-muted, #999);
+        font-size: 11px;
+        text-align: left;
+        cursor: pointer;
+      }
+      .tree-section-trigger:hover, .tree-section-trigger[aria-expanded="true"] { background: var(--oc-hover, rgba(127, 127, 127, 0.15)); }
+      .tree-list, .tree-children { list-style: none; padding: 0; }
+      .tree-list { max-height: 240px; overflow: auto; margin: 3px 0 0; }
+      .tree-children { margin: 0 0 0 12px; padding-left: 4px; border-left: 1px solid var(--oc-border, rgba(127, 127, 127, 0.28)); }
+      .tree-children.is-deep { margin-left: 0; padding-left: 0; border-left: 0; }
+      .tree-item { min-width: 0; }
+      .tree-row { display: flex; align-items: flex-start; min-width: 0; }
+      .tree-disclosure, .tree-disclosure-spacer {
+        flex: none;
+        width: 22px;
+        height: 24px;
+      }
+      .tree-disclosure {
+        padding: 0;
+        border: 0;
+        border-radius: 5px;
+        background: transparent;
+        color: var(--oc-muted, #999);
+        font-size: 10px;
+        cursor: pointer;
+      }
+      .tree-disclosure:hover { background: var(--oc-hover, rgba(127, 127, 127, 0.15)); }
+      .tree-session {
+        display: flex;
+        flex: 1 1 0;
+        flex-direction: column;
+        align-items: stretch;
+        min-width: 0;
+        min-height: 24px;
+        padding: 4px 5px;
+        border: 0;
+        border-radius: 5px;
+        background: transparent;
+        text-align: left;
+        cursor: pointer;
+      }
+      .tree-session:hover { background: var(--oc-hover, rgba(127, 127, 127, 0.15)); }
+      .tree-headline { display: flex; align-items: baseline; gap: 5px; min-width: 0; }
+      .tree-title { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; }
+      .tree-child-count { flex: none; color: var(--oc-muted, #999); font-size: 10px; }
+      .tree-details { display: flex; flex-wrap: wrap; gap: 1px 6px; min-width: 0; color: var(--oc-muted, #999); font-size: 10px; line-height: 1.4; }
+      .tree-state, .tree-outcome { flex: none; }
+      .tree-state.is-live { color: var(--oc-primary, #6aa9ff); }
+      .tree-metadata { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--oc-mono, ui-monospace, monospace); }
+
       .layers {
         display: flex;
         flex-direction: column;

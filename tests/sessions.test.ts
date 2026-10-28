@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { groupActiveSessions, sameDirectory, type AgentSession } from '../src/sessions.ts';
+import { buildSessionTree, groupActiveSessions, sameDirectory, type AgentSession } from '../src/sessions.ts';
 
 const session = (overrides: Partial<AgentSession> = {}): AgentSession => ({
   id: 's1', title: 'Arbeit', projectId: 'p1', directory: '/project', parentId: 'parent',
@@ -51,6 +51,41 @@ test('no active subagents produces no groups', () => {
     session({ parentId: null }),
   ], 'p1', '/project');
   assert.equal(grouped.size, 0);
+});
+
+const current = { id: 'root', title: 'Aktuell', busy: false, agent: 'fixer', model: 'model/id' };
+
+test('builds a tree rooted at the current session, including nested descendants', () => {
+  const tree = buildSessionTree(current, [
+    session({ id: 'root', title: 'Workspace-Titel', parentId: null }),
+    session({ id: 'child', title: 'Kind', parentId: 'root', agent: undefined }),
+    session({ id: 'grandchild', title: 'Enkel', parentId: 'child', directory: '/worktree', agent: undefined }),
+    session({ id: 'sibling', title: 'Zweites Kind', parentId: 'root' }),
+  ]);
+  assert.equal(tree?.title, 'Aktuell');
+  assert.deepEqual(tree?.children.map((node) => node.id), ['child', 'sibling']);
+  assert.deepEqual(tree?.children[0].children.map((node) => node.id), ['grandchild']);
+  assert.deepEqual(tree?.children[0].children[0].children, []);
+});
+
+test('excludes orphans and archived sessions with their descendants', () => {
+  const tree = buildSessionTree(current, [
+    session({ id: 'visible', parentId: 'root' }),
+    session({ id: 'orphan', parentId: 'outside' }),
+    session({ id: 'archived', parentId: 'root', archivedAt: 123 }),
+    session({ id: 'archived-child', parentId: 'archived' }),
+    session({ id: 'cycle', parentId: 'cycle' }),
+  ]);
+  assert.deepEqual(tree?.children.map((node) => node.id), ['visible']);
+  assert.equal(buildSessionTree(current, [session({ id: 'root', archivedAt: 1 })]), null);
+});
+
+test('no current session is empty; a missing workspace root still shows available children', () => {
+  const records = [session({ id: 'child', parentId: 'root' })];
+  assert.equal(buildSessionTree(null, records), null);
+  const tree = buildSessionTree(current, records);
+  assert.equal(tree?.record, null);
+  assert.deepEqual(tree?.children.map((node) => node.id), ['child']);
 });
 
 test('compares paths without confusing Windows case and POSIX case', () => {
