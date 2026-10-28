@@ -224,6 +224,32 @@ test('resolves the global preset when there is no project layer', () => {
   assert.equal(result.view.activePath, GLOBAL);
 });
 
+test('reads a preset that wraps its agent map in an agents key', () => {
+  const raw = `{
+    "preset": "nested",
+    "presets": {
+      "nested": {
+        "agents": {
+          "orchestrator": {
+            "model": "github-copilot/gpt-6-luna-275k",
+            "variant": "high"
+          },
+          "oracle": { "model": "github-copilot/gpt-6.1-sol" }
+        },
+        "marketplace": { "agents": ["alvin/janitor"] }
+      }
+    }
+  }`;
+  const result = resolvePresetView(layer('global', GLOBAL, raw), null);
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.deepEqual(result.view.active, { name: 'nested', origin: 'global' });
+  assert.deepEqual(result.view.agents, [
+    { agent: 'orchestrator', model: 'github-copilot/gpt-6-luna-275k', variant: 'high' },
+    { agent: 'oracle', model: 'github-copilot/gpt-6.1-sol' },
+  ]);
+});
+
 test('the project override wins and writes to the project file', () => {
   const projectRaw = '{ "preset": "free" }';
   const global = layer('global', GLOBAL, CONFIG);

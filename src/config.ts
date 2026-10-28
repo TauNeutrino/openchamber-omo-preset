@@ -88,8 +88,11 @@ const nonEmptyString = (value: unknown): string | null => {
 
 const agentsOf = (block: unknown): PresetAgent[] => {
   if (!isPlainObject(block)) return [];
+  // Newer slim configs wrap the agent map in an `agents` key (next to
+  // `marketplace`); read through that layer when it is present.
+  const map = isPlainObject(block.agents) ? block.agents : block;
   const agents: PresetAgent[] = [];
-  for (const [agent, value] of Object.entries(block)) {
+  for (const [agent, value] of Object.entries(map)) {
     if (!isPlainObject(value)) continue;
     const model = nonEmptyString(value.model);
     if (!model) continue;
