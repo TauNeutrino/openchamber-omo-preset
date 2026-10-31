@@ -75,6 +75,11 @@ const server = http.createServer(async (req, res) => {
   }
   const url = new URL(req.url ?? '/', `http://127.0.0.1:${PORT}`);
   try {
+    // The host polls GET /health to decide the service has become ready.
+    if (url.pathname === '/health') {
+      send(res, 200, { ok: true });
+      return;
+    }
     if (url.pathname === '/models') {
       const force = url.searchParams.get('refresh') === 'true';
       const { catalog, checkedAt } = await getCatalog(force);
