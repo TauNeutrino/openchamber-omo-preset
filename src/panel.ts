@@ -22,6 +22,7 @@ import {
   type WriteTarget,
 } from './config.ts';
 import { buildSessionTree, groupActiveSessions, sameDirectory, type AgentSession, type SessionTreeNode } from './sessions.ts';
+import { auditModelRefs, collectModelRefs, type ModelAudit } from './model-audit.ts';
 
 // The extension can see the global omo-slim config through the manifest's
 // filesystem globs. The project override is a relative path, which the host
@@ -197,10 +198,13 @@ const paintBanner = (parent: Element, value: Notice): void => {
   }));
 };
 
+const auditForReadyScreen = (): ModelAudit | null => (modelCheck.kind === 'done' ? modelCheck.audit : null);
+
 const agentRow = (agent: PresetAgent): HTMLElement => {
   const key = agent.agent;
   const name = agent.agent;
-  const group = element('div', 'agent-group');
+  const missing = modelIsMissing(auditForReadyScreen(), agent.model);
+  const group = element('div', missing ? 'agent-group is-missing' : 'agent-group');
   const row = element('div', 'agent');
   const sessions = activeSessions.get(key) ?? [];
   if (sessions.length) {
@@ -229,7 +233,8 @@ const agentRow = (agent: PresetAgent): HTMLElement => {
     variant.append(element('span', 'model-content', agent.variant));
     value.append(variant);
   }
-  value.title = `${agent.agent} · ${agent.model}${agent.variant ? ` (${agent.variant})` : ''}`;
+  value.title = `${agent.agent} · ${agent.model}${agent.variant ? ` (${agent.variant})` : ''}`
+    + (missing ? ' · Modell nicht im Katalog gefunden' : '');
   row.append(value);
   group.append(row);
   if (sessions.length && openAgent === key) {
@@ -434,6 +439,58 @@ const paintTrigger = (parent: Element, model: ReadyModel, busy: boolean): void =
   parent.append(trigger);
 };
 
+const paintMissingModelsBanner = (panel: HTMLElement, audit: ModelAudit): void => {
+  if (audit.missing.length === 0) return;
+  const when = audit.checkedAt
+    ? new Date(audit.checkedAt).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
+    : null;
+  const body = audit.missing.map((entry) => entry.ref).join(', ')
+    + (when ? ` — geprüft ${when}` : '');
+  mounted.push(mountBanner(panel, {
+    tone: 'error',
+    title: `${audit.missing.length} konfiguriertes Modell${audit.missing.length === 1 ? '' : 'e'} ${audit.missing.length === 1 ? 'ist' : 'sind'} nicht mehr im Modellkatalog`,
+    body,
+  }));
+};
+
+const paintModelCheckRow = (panel: HTMLElement, check: ModelCheck, busy: boolean): void => {
+  const row = element('div', 'model-check');
+  const label = element('span', 'model-check-label');
+  const action = element('button', 'model-check-refresh', '↻');
+  action.type = 'button';
+  action.disabled = busy;
+  const audit: ModelAudit | null = check.kind === 'done' ? check.audit : null;
+  if (check.kind === 'checking') {
+    label.append(element('span', 'is-muted', 'Modelle werden geprüft …'));
+    action.disabled = true;
+  } else if (check.kind === 'unavailable') {
+    label.append(element('span', 'is-muted', 'Modellprüfung nicht verfügbar (Service nicht freigegeben).'));
+    action.remove();
+  } else if (check.kind === 'failed') {
+    label.append(element('span', 'is-muted', `Modellprüfung fehlgeschlagen: ${check.message}`));
+    action.title = 'Erneut prüfen';
+    action.addEventListener('click', () => refreshModelCheck(modelCheckRefs));
+  } else if (audit && audit.checkedAt === null) {
+    label.append(element('span', 'is-muted', audit.checked === 0 ? 'Keine Modelle konfiguriert.' : 'Noch nicht geprüft.'));
+    action.remove();
+  } else if (audit) {
+    const when = audit.checkedAt ? new Date(audit.checkedAt).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : '';
+    label.append(element('span', audit.ok ? 'is-ok' : 'is-missing', audit.ok
+      ? `✓ Alle ${audit.checked} konfigurierten Modelle verfügbar`
+      : `⚠ ${audit.missing.length} von ${audit.checked} Modellen fehlen im Katalog`));
+    label.title = `Geprüft ${when} · Kataloggröße ${audit.catalogSize}`;
+    action.title = 'Erneut prüfen';
+    action.addEventListener('click', () => refreshModelCheck(modelCheckRefs));
+  }
+  row.append(label);
+  if (action.isConnected) row.append(action);
+  panel.append(row);
+};
+
+const modelIsMissing = (audit: ModelAudit | null, model: string): boolean => (
+  audit !== null && audit.checkedAt !== null && audit.missing.some((entry) => entry.ref === model)
+);
+
 const paintReady = (panel: HTMLElement, model: ReadyModel): void => {
   const busy = interaction.kind === 'applying';
 
@@ -450,6 +507,8 @@ const paintReady = (panel: HTMLElement, model: ReadyModel): void => {
   });
   head.append(refresh);
   panel.append(head);
+
+  if (modelCheck.kind === 'done') paintMissingModelsBanner(panel, modelCheck.audit);
 
   if (interaction.kind === 'confirm' || interaction.kind === 'applying') {
     const name = interaction.name;
@@ -522,6 +581,7 @@ const paintReady = (panel: HTMLElement, model: ReadyModel): void => {
   panel.append(layers);
 
   paintSessionTree(panel);
+  paintModelCheckRow(panel, modelCheck, busy);
   panel.append(element('p', 'hint', RESTART_HINT));
 };
 
@@ -650,6 +710,74 @@ const watchSessions = (currentDirectory: string | null): void => {
   }).catch(() => undefined);
 };
 
+// ---------------------------------------------------------------------------
+// Model availability check
+//
+// The panel asks the package service (contributes.service) for the model
+// catalog the effective OpenCode installation reports. Configured references
+// missing from the catalog get a red badge and move the first banner to a
+// warning, because providers (especially free tiers) retire model ids.
+
+const MODEL_CHECK_RETRY_MS = 15 * 60 * 1000;
+
+type ModelCheck =
+  | { kind: 'checking' }
+  | { kind: 'unavailable' }
+  | { kind: 'failed'; message: string }
+  | { kind: 'done'; audit: ModelAudit };
+
+let modelCheck: ModelCheck = { kind: 'checking' };
+let modelCheckTimer: ReturnType<typeof setTimeout> | 0 = 0;
+let modelCheckRefs: readonly string[] = [];
+
+const scheduleModelCheck = (refs: readonly string[]): void => {
+  if (modelCheckTimer) clearTimeout(modelCheckTimer);
+  modelCheckTimer = setTimeout(() => {
+    modelCheckTimer = 0;
+    refreshModelCheck(refs, { background: true });
+  }, MODEL_CHECK_RETRY_MS);
+};
+
+const refreshModelCheck = (refs: readonly string[], options: { background?: boolean } = {}): void => {
+  if (refs.length === 0) {
+    modelCheck = { kind: 'done', audit: auditModelRefs([], [], null) };
+    if (!options.background) paint();
+    return;
+  }
+  modelCheckRefs = refs;
+  if (!options.background) {
+    modelCheck = { kind: 'checking' };
+    paint();
+  }
+  void host.serviceRequest({ method: 'GET', path: '/models' })
+    .then((result) => {
+      if (result.status !== 200) throw new Error(`Service antwortete HTTP ${result.status}.`);
+      const answer = JSON.parse(result.body) as { ok?: boolean; catalog?: unknown; checkedAt?: string };
+      if (!answer.ok || !Array.isArray(answer.catalog)) throw new Error('Katalogantwort unverständlich.');
+      const audit = auditModelRefs(refs, answer.catalog as string[], answer.checkedAt ?? null);
+      modelCheck = { kind: 'done', audit };
+      paint();
+      scheduleModelCheck(refs);
+    })
+    .catch((error: unknown) => {
+      if (error instanceof HostRequestError && (error.code === 'NOT_GRANTED' || error.code === 'NO_SERVICE')) {
+        modelCheck = { kind: 'unavailable' };
+      } else {
+        modelCheck = { kind: 'failed', message: errorText(error) };
+      }
+      paint();
+      scheduleModelCheck(refs);
+    });
+};
+
+const auditRefsFor = (view: PresetView, project: ParsedLayer | null): string[] => collectModelRefs(
+  view.agents,
+  [
+    view.active.name && view.presets[view.active.name] ? view.presets[view.active.name] : null,
+    project && project.config.preset && view.presets[project.config.preset] ? view.presets[project.config.preset] : null,
+  ],
+);
+
 const loadAndPaint = async (): Promise<void> => {
   const token = ++loadToken;
   const currentDirectory = directory;
@@ -684,6 +812,7 @@ const loadAndPaint = async (): Promise<void> => {
     },
   };
   paint();
+  refreshModelCheck(auditRefsFor(resolved.view, layers.project));
 };
 
 const applyPreset = async (name: string): Promise<void> => {

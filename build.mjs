@@ -16,3 +16,18 @@ await build({
   legalComments: 'none',
   logLevel: 'info',
 });
+
+// The service runs under the host's Node (process.execPath + ELECTRON_RUN_AS_NODE):
+// bundled ESM, node platform, no external module resolution at runtime.
+await build({
+  entryPoints: ['src/service.ts'],
+  outfile: 'service/main.js',
+  bundle: true,
+  format: 'esm',
+  platform: 'node',
+  target: ['node22'],
+  minify: true,
+  sourcemap: false,
+  legalComments: 'none',
+  logLevel: 'info',
+});
