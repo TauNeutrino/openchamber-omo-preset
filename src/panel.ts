@@ -226,7 +226,14 @@ const agentRow = (agent: PresetAgent): HTMLElement => {
   }
   const value = element('span', 'agent-model');
   const model = element('span', 'model-text');
-  model.append(element('span', 'model-content', agent.model));
+  // Provider part dezent, Modell-ID betont — Split am letzten "/".
+  const slash = agent.model.lastIndexOf('/');
+  if (slash > 0) {
+    model.append(element('span', 'model-provider', agent.model.slice(0, slash + 1)));
+    model.append(element('span', 'model-content', agent.model.slice(slash + 1)));
+  } else {
+    model.append(element('span', 'model-content', agent.model));
+  }
   value.append(model);
   if (agent.variant) {
     const variant = element('span', 'variant');

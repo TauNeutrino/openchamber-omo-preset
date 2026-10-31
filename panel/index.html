@@ -174,24 +174,31 @@
         font: 11px/1.4 var(--oc-mono, ui-monospace, monospace);
         text-align: right;
       }
-      .model-text, .variant {
+      /* Modell-ID und Variant-Pill bleiben immer voll sichtbar; nur der
+         dezente Provider-Anteil wird bei Platzmangel mit „…“ gekürzt. */
+      .model-text {
+        display: inline-flex;
+        flex: 0 1 auto;
+        min-width: 0;
+        max-width: 100%;
+      }
+      .model-provider {
+        flex: 0 1 auto;
         min-width: 0;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
-        direction: rtl;
-        text-align: right;
+        color: var(--oc-muted, #999);
       }
-      .model-text { flex: 0 1 auto; }
-      .model-content { direction: ltr; unicode-bidi: isolate; }
+      .model-content { flex: 0 0 auto; white-space: nowrap; }
       .variant {
-        flex: 0 1 auto;
-        max-width: 42%;
+        flex: 0 0 auto;
         padding: 0 5px;
         border: 1px solid var(--oc-border, rgba(127, 127, 127, 0.28));
         border-radius: 999px;
         color: var(--oc-muted, #999);
         font: 10px/1.6 var(--oc-mono, ui-monospace, monospace);
+        white-space: nowrap;
       }
       .agent-disclosure {
         display: inline-flex;
