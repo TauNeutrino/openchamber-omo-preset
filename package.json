@@ -1,6 +1,6 @@
 {
   "name": "omo-preset",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "private": true,
   "description": "Switch oh-my-opencode-slim presets from an OpenChamber panel without touching the rest of the config.",
   "type": "module",

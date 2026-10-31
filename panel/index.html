@@ -141,23 +141,25 @@
       .option-check { flex: none; font-size: 11px; color: var(--oc-primary, #6aa9ff); }
       .preset-option[data-active="true"] .option-check { color: inherit; }
 
+      /* Zwei geteilte Spalten über alle Zeilen: Agenten links (Breite =
+         breitester Name), Modelle bündig rechts und nie in der Agenten-
+         Spalte. display:contents macht Tiefenstruktur zu Grid-Kindern. */
       .agents {
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
+        display: grid;
+        grid-template-columns: max-content minmax(0, 1fr);
+        column-gap: 12px;
+        row-gap: 2px;
+        align-items: center;
         padding-top: 1px;
       }
-      .agents-empty { font-size: 11px; color: var(--oc-muted, #999); }
-      .agent {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 10px;
-        min-width: 0;
-      }
+      .agents-empty { grid-column: 1 / -1; font-size: 11px; color: var(--oc-muted, #999); }
+      .agent-group, .agent { display: contents; }
+      .agent-disclosure { grid-column: 1; }
+      .agent-name { grid-column: 1; }
+      .agent-model { grid-column: 2; }
       .agent-name {
-        flex: 0 1 auto;
-        max-width: 42%;
+        min-width: 0;
+        max-width: 24ch;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
@@ -169,7 +171,6 @@
         align-items: baseline;
         justify-content: flex-end;
         gap: 5px;
-        flex: 1 1 0;
         min-width: 0;
         font: 11px/1.4 var(--oc-mono, ui-monospace, monospace);
         text-align: right;
@@ -204,8 +205,6 @@
         display: inline-flex;
         align-items: center;
         gap: 4px;
-        flex: 0 1 auto;
-        max-width: 42%;
         min-width: 0;
         min-height: 24px;
         margin: -2px 0 -2px -4px;
@@ -222,6 +221,7 @@
       .session-count sup { font-size: 9px; }
       .agent-chevron { flex: none; color: var(--oc-muted, #999); font-size: 9px; }
       .session-list {
+        grid-column: 1 / -1;
         display: flex;
         flex-direction: column;
         gap: 1px;
@@ -413,6 +413,6 @@
   </head>
   <body>
     <div id="root"></div>
-    <script src="main.js?v=1.1.1"></script>
+    <script src="main.js?v=1.1.2"></script>
   </body>
 </html>
