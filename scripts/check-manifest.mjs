@@ -38,10 +38,11 @@ if (scriptSources.length === 0) {
   throw new Error('The panel HTML references no script.');
 }
 for (const source of scriptSources) {
-  if (source.includes('..') || source.startsWith('/')) {
+  const bare = source.split('?')[0].split('#')[0];
+  if (bare.includes('..') || bare.startsWith('/')) {
     throw new Error(`Script ${source} must stay inside the package.`);
   }
-  const scriptPath = resolve(dirname(panel.entry), source);
+  const scriptPath = resolve(dirname(panel.entry), bare);
   const info = await stat(scriptPath);
   if (!info.isFile() || info.size === 0) {
     throw new Error(`Built script ${scriptPath} is missing or empty. Run npm run build.`);
