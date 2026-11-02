@@ -1,6 +1,8 @@
-# Omo Preset
+# Omo Slim Preset Selector
 
 Eine OpenChamber-Extension, die das aktive Preset von **oh-my-opencode-slim** anzeigt und wechselt — ohne TUI und ohne die Config von Hand zu bearbeiten.
+
+![Screenshot](assets/screenshot.png)
 
 - Panel auf der rechten Leiste und Sektion im Work-Status-Panel.
 - Zeigt aktives Preset, Herkunft (`Global` / `Projekt`) und die Agent→Modell-Zuordnung des aktiven Presets.
@@ -16,7 +18,13 @@ Eine OpenChamber-Extension, die das aktive Preset von **oh-my-opencode-slim** an
 
 Es gibt keine Remote-Installation und keinen eigenen Service. Das Manifest deklariert `apiVersion: 1`, einen Panel-Beitrag und dieselbe Seite als Work-Status-Sektion.
 
-## Verhalten
+## Support
+
+Wenn dir die Extension gefällt, kannst du die Entwicklung unterstützen:
+
+[![Donate with PayPal](https://www.paypalobjects.com/en_US/i/btn/btn_donate_SM.gif)](https://www.paypal.com/donate/?hosted_button_id=R5G9H9TFGQNUY)
+
+[![ko-fi](https://storage.ko-fi.com/cdn/kofi5.png?v=6)](https://ko-fi.com/O4O01ZCNJE)
 
 ### Modellprüfung
 Das Panel prüft nach jedem Laden (und dann alle 15 Minuten), ob die konfigurierten Modelle im effektiven Modellkatalog existieren. Der Katalog kommt von einem Local-Service der Extension (host-gemanagt, startet beim ersten `serviceRequest`), der `opencode models` befragt — keine Hintergrundlast außer bei Bedarf, 60-Sekunden-Cache. Fehlende Modelle werden an der Agenten-Zeile rot markiert und oben als Warnung zusammengefasst. Der Katalog wird beim Laden und dann alle 15 Minuten erneut geprüft.
