@@ -21,7 +21,7 @@ import {
   type PresetView,
   type WriteTarget,
 } from './config.ts';
-import { buildSessionTree, groupActiveSessions, sameDirectory, type AgentSession, type SessionTreeNode } from './sessions.ts';
+import { buildSessionTree, countGlyph, groupAgentSessions, sameDirectory, type AgentSession, type AgentSessionGroups, type SessionTreeNode } from './sessions.ts';
 import { auditModelRefs, collectModelRefs, type ModelAudit } from './model-audit.ts';
 
 // The extension can see the global omo-slim config through the manifest's
@@ -79,8 +79,10 @@ let notice: Notice | null = null;
 let loadToken = 0;
 let heightFrame = 0;
 let mounted: Array<{ dispose: () => void }> = [];
-let activeSessions = new Map<string, AgentSession[]>();
+let agentSessions = new Map<string, AgentSessionGroups>();
 let currentSession: SessionSnapshot | null = null;
+/** Finished sessions hidden early (eye button); a new activity on a hidden session clears it. */
+const dismissedSessions = new Set<string>();
 let workspaceSessions: GuestSessionRecord[] = [];
 let treeOpen = false;
 const collapsedTreeNodes = new Set<string>();
@@ -206,16 +208,22 @@ const agentRow = (agent: PresetAgent): HTMLElement => {
   const missing = modelIsMissing(auditForReadyScreen(), agent.model);
   const group = element('div', missing ? 'agent-group is-missing' : 'agent-group');
   const row = element('div', 'agent');
-  const sessions = activeSessions.get(key) ?? [];
-  if (sessions.length) {
+  const sessions = agentSessions.get(key)?.active ?? [];
+  const recent = (agentSessions.get(key)?.recent ?? []).filter((entry) => !dismissedSessions.has(entry.id));
+  if (sessions.length || recent.length) {
     const trigger = element('button', 'agent-disclosure');
     trigger.type = 'button';
     trigger.dataset.agent = key;
     trigger.setAttribute('aria-expanded', String(openAgent === key));
-    trigger.setAttribute('aria-label', `${name}: ${sessions.length} aktive Sessions`);
-    const count = element('span', 'session-count', ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '⑩'][Math.min(sessions.length, 10) - 1]);
-    if (sessions.length > 10) count.append(element('sup', '', '+'));
-    trigger.append(count, element('span', 'agent-name', name), element('span', 'agent-chevron', openAgent === key ? '▴' : '▾'));
+    const parts = [`${sessions.length} aktiv`];
+    if (recent.length) parts.push(`${recent.length} letzte`);
+    trigger.setAttribute('aria-label', `${name}: ${parts.join(', ')}${parts.length > 1 ? ' (letzte 8 Std)' : ''} — Zum Aufklappen`);
+    trigger.append(...[
+      sessions.length ? element('span', 'session-count', countGlyph(Math.min(sessions.length, 10)) + (sessions.length > 10 ? '+' : '')) : null,
+      recent.length ? element('span', 'session-count is-done', countGlyph(Math.min(recent.length, 10)) + (recent.length > 10 ? '+' : '')) : null,
+      element('span', 'agent-name', name),
+      element('span', 'agent-chevron', openAgent === key ? '▴' : '▾'),
+    ].filter((node): node is HTMLElement => node !== null));
     trigger.addEventListener('click', () => {
       openAgent = openAgent === key ? undefined : key;
       paint();
@@ -244,25 +252,60 @@ const agentRow = (agent: PresetAgent): HTMLElement => {
     + (missing ? ' · Modell nicht im Katalog gefunden' : '');
   row.append(value);
   group.append(row);
-  if (sessions.length && openAgent === key) {
+  if ((sessions.length || recent.length) && openAgent === key) {
     const list = element('div', 'session-list');
-    list.setAttribute('aria-label', `Aktive Sessions: ${name}`);
-    for (const session of sessions) {
-      const option = element('button', 'session-option');
-      option.type = 'button';
+    list.setAttribute('aria-label', `${name}: aktive und letzte Sessions (8 Std)`);
+    const dismissTitle = 'Vorzeitig ausblenden (wirkt bis zur nächsten Aktivität)';
+    const eyeSlash = (): SVGSVGElement => {
+      // Augen-Icon mit Diagonalstrich: 12×12 viewBox, Kreisauge + Pupille.
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('viewBox', '0 0 24 24');
+      svg.setAttribute('aria-hidden', 'true');
+      svg.innerHTML = '<path d="M3 3l18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>'
+        + '<path d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12s-3.5 6.5-9.5 6.5S2.5 12 2.5 12Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>'
+        + '<circle cx="12" cy="12" r="2.5" fill="currentColor"/>';
+      return svg;
+    };
+    const rows: { session: AgentSession; done: boolean }[] = [
+      ...sessions.map((session) => ({ session, done: false })),
+      ...recent.map((session) => ({ session, done: true })),
+    ];
+    for (const { session, done } of rows) {
+      const option = element('div', done ? 'session-option is-done' : 'session-option');
       option.dataset.session = session.id;
+      const open = element('button', 'session-open');
+      open.type = 'button';
       const label = element('span', 'session-title', session.title || 'Session ohne Titel');
-      option.title = session.title;
-      option.append(label);
-      const activity = session.activity === 'waiting-permission' ? 'Warten auf Freigabe'
-        : session.activity === 'waiting-question' ? 'Warten auf Antwort'
-          : session.activity === 'retrying' ? 'Erneuter Versuch' : '';
-      if (activity) option.append(element('span', 'session-activity', activity));
-      option.addEventListener('click', () => {
-        void host.openSession(session.id).catch((error: unknown) => {
-          void host.toast({ kind: 'error', message: `Session konnte nicht geöffnet werden: ${errorText(error)}` }).catch(() => undefined);
-        });
+      open.title = session.title;
+      open.append(label);
+      if (done) {
+        const outcome = session.outcome === 'completed' ? '✓'
+          : session.outcome === 'failed' ? '×' : '';
+        const when = relativeTime(session.updatedAt);
+        open.append(element('span', 'session-activity', outcome ? `${outcome} ${when}` : when));
+      } else {
+        const activity = session.activity === 'waiting-permission' ? 'Warten auf Freigabe'
+          : session.activity === 'waiting-question' ? 'Warten auf Antwort'
+            : session.activity === 'retrying' ? 'Erneuter Versuch' : '';
+        if (activity) open.append(element('span', 'session-activity', activity));
+      }
+      open.addEventListener('click', () => {
+        openSession(session.id);
       });
+      option.append(open);
+      if (done) {
+        const hide = element('button', 'session-hide');
+        hide.type = 'button';
+        hide.title = dismissTitle;
+        hide.setAttribute('aria-label', dismissTitle);
+        hide.append(eyeSlash());
+        hide.addEventListener('click', (event) => {
+          event.stopPropagation();
+          dismissedSessions.add(session.id);
+          paint();
+        });
+        option.append(hide);
+      }
       list.append(option);
     }
     group.append(list);
@@ -651,7 +694,7 @@ const watchSessions = (currentDirectory: string | null): void => {
   stopSessions?.(); stopSessions = null;
   ++subscriptionToken;
   subscribedProject = null;
-  activeSessions = new Map();
+  agentSessions = new Map();
   workspaceSessions = [];
   collapsedTreeNodes.clear();
   openAgent = undefined;
@@ -673,7 +716,7 @@ const watchSessions = (currentDirectory: string | null): void => {
     stopSessions?.(); stopSessions = null;
     const subscription = ++subscriptionToken;
     subscribedProject = projectId;
-    activeSessions = new Map();
+    agentSessions = new Map();
     workspaceSessions = [];
     openAgent = undefined;
     paint();
@@ -682,12 +725,18 @@ const watchSessions = (currentDirectory: string | null): void => {
       const unsubscribe = await host.onSessions(projectId, (snapshot) => {
         if (token !== sessionsToken || subscription !== subscriptionToken || subscribedProject !== projectId || snapshot.projectId !== projectId) return;
         const records = snapshot.sessions.filter((session) => session.projectId === projectId);
-        const next = groupActiveSessions(records as AgentSession[], projectId, currentDirectory);
+        const next = groupAgentSessions(records as AgentSession[], projectId, currentDirectory);
         // Avoid stealing focus on unchanged host updates.
-        const signature = (groups: Map<string, AgentSession[]>): string => JSON.stringify([...groups].map(([name, entries]) => [name, entries.map((entry) => [entry.id, entry.title, entry.activity])]));
+        const signature = (groups: Map<string, AgentSessionGroups>): string => JSON.stringify([...groups].map(([name, entries]) => [
+          name,
+          entries.active.map((entry) => [entry.id, entry.title, entry.activity]),
+          entries.recent.map((entry) => [entry.id, entry.title, entry.activity, entry.updatedAt]),
+        ]));
         const treeSignature = (sessions: GuestSessionRecord[]): string => JSON.stringify(sessions.map((session) => [session.id, session.title, session.parentId, session.archivedAt, session.activity, session.outcome, session.updatedAt]));
-        const unchanged = signature(next) === signature(activeSessions) && treeSignature(records) === treeSignature(workspaceSessions);
-        activeSessions = next;
+        const unchanged = signature(next) === signature(agentSessions) && treeSignature(records) === treeSignature(workspaceSessions);
+        agentSessions = next;
+        // Aktivität setzt eine vorzeitige Ausblendung zurück.
+        for (const entry of next.values()) for (const active of entry.active) dismissedSessions.delete(active.id);
         workspaceSessions = records;
         if (unchanged) return;
         if (openAgent !== undefined && !next.has(openAgent)) openAgent = undefined;

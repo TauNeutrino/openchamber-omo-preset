@@ -48,19 +48,56 @@ export const sameDirectory = (a: string, b: string): boolean => {
   return normalize(a) === normalize(b);
 };
 
+/** Activities that mean the session is still doing something. */
+export const ACTIVE_ACTIVITIES = ['running', 'retrying', 'waiting-permission', 'waiting-question'] as const;
+
+const isActiveSession = (activity: GuestSessionRecord['activity']): boolean => (
+  (ACTIVE_ACTIVITIES as readonly string[]).includes(activity)
+);
+
+/** Finished sessions stay listed this long after their last update. */
+export const FINISHED_WINDOW_MS = 8 * 60 * 60 * 1000;
+
+/** ①–⑩, clamped at ⑩; counts above 10 get a `+` appended by the caller. */
+export const countGlyph = (n: number): string => ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '⑩'][Math.min(Math.max(n, 1), 10) - 1];
+
+export type AgentSessionGroups = {
+  /** Sessions still doing something. */
+  active: AgentSession[];
+  /** Finished within the recent window, newest first. */
+  recent: AgentSession[];
+};
+
+export const groupAgentSessions = (
+  sessions: AgentSession[], projectId: string, directory: string, now: number = Date.now(),
+): Map<string, AgentSessionGroups> => {
+  const groups = new Map<string, AgentSessionGroups>();
+  const windowStart = now - FINISHED_WINDOW_MS;
+  for (const session of sessions) {
+    if (session.projectId !== projectId || !sameDirectory(session.directory, directory)
+      || session.parentId === null || session.archivedAt !== null
+      || (typeof session.agent !== 'string' || !session.agent.trim())) continue;
+    if (!isActiveSession(session.activity) && session.updatedAt < windowStart) continue;
+    const entry = groups.get(session.agent) ?? { active: [], recent: [] };
+    if (isActiveSession(session.activity)) {
+      entry.active.push(session);
+    } else {
+      entry.recent.push(session);
+    }
+    groups.set(session.agent, entry);
+  }
+  for (const entry of groups.values()) {
+    entry.recent.sort((a, b) => b.updatedAt - a.updatedAt);
+  }
+  return groups;
+};
+
 export const groupActiveSessions = (
   sessions: AgentSession[], projectId: string, directory: string,
 ): Map<string, AgentSession[]> => {
   const groups = new Map<string, AgentSession[]>();
-  for (const session of sessions) {
-    if (session.projectId !== projectId || !sameDirectory(session.directory, directory)
-      || session.parentId === null || session.archivedAt !== null
-      || !['running', 'retrying', 'waiting-permission', 'waiting-question'].includes(session.activity)) continue;
-    if (typeof session.agent !== 'string' || !session.agent.trim()) continue;
-    const agent = session.agent;
-    const group = groups.get(agent) ?? [];
-    group.push(session);
-    groups.set(agent, group);
+  for (const [agent, entry] of groupAgentSessions(sessions, projectId, directory)) {
+    if (entry.active.length) groups.set(agent, entry.active);
   }
   return groups;
 };
