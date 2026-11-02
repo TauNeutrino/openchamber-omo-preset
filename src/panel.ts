@@ -279,6 +279,11 @@ const agentRow = (agent: PresetAgent): HTMLElement => {
           : session.activity === 'waiting-question' ? 'Warten auf Antwort'
             : session.activity === 'retrying' ? 'Erneuter Versuch' : '';
         if (activity) open.append(element('span', 'session-activity', activity));
+        const elapsed = element('span', 'session-activity is-live');
+        elapsed.dataset.elapsedStart = String(session.createdAt);
+        elapsed.textContent = formatDuration(Date.now() - session.createdAt);
+        elapsed.title = 'Laufzeit seit Erstellung';
+        open.append(elapsed);
       }
       open.addEventListener('click', () => {
         openSession(session.id);
@@ -299,6 +304,15 @@ const agentRow = (agent: PresetAgent): HTMLElement => {
       }
       list.append(option);
     }
+    // Laufzeit-Anzeigen jede Sekunde weiterticken; repaint entsorgt das Intervall.
+    const tickElapsed = (): void => {
+      const now = Date.now();
+      for (const node of list.querySelectorAll<HTMLElement>('.is-live[data-elapsed-start]')) {
+        node.textContent = formatDuration(now - Number(node.dataset.elapsedStart ?? '0'));
+      }
+    };
+    const elapsedTimer = setInterval(tickElapsed, 1000);
+    mounted.push({ dispose: () => clearInterval(elapsedTimer) });
     group.append(list);
   }
   return group;
@@ -311,6 +325,16 @@ const relativeTime = (timestamp: number): string => {
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `vor ${hours} Std`;
   return `vor ${Math.floor(hours / 24)} Tagen`;
+};
+
+/** Kompakte Laufzeit wie in OpenChamber selbst: 45s, 1m 3s, 2h 15m. */
+const formatDuration = (ms: number): string => {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  if (total < 60) return `${total}s`;
+  const minutes = Math.floor(total / 60);
+  if (minutes < 60) return `${minutes}m ${total % 60}s`;
+  const hours = Math.floor(minutes / 60);
+  return `${hours}h ${minutes % 60}m`;
 };
 
 const openSession = (id: string): void => {

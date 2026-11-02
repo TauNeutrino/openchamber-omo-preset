@@ -272,6 +272,7 @@
       .session-open:hover { background: var(--oc-hover, rgba(127, 127, 127, 0.15)); }
       .session-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
       .session-activity { flex: none; color: var(--oc-muted, #999); font-size: 10px; }
+      .session-activity.is-live { color: var(--oc-info, #3fa9f5); font-variant-numeric: tabular-nums; min-width: 3.5ch; text-align: right; }
       .session-hide {
         flex: none;
         display: inline-flex;
@@ -450,6 +451,6 @@
   </head>
   <body>
     <div id="root"></div>
-    <script src="main.js?v=1.1.6"></script>
+    <script src="main.js?v=1.1.7"></script>
   </body>
 </html>
