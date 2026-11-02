@@ -25,22 +25,6 @@
         padding: 10px 12px 12px;
         min-width: 0;
       }
-      .head {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 8px;
-        min-height: 20px;
-      }
-      .eyebrow {
-        font: 10px/1.2 var(--oc-mono, ui-monospace, monospace);
-        letter-spacing: 0.12em;
-        text-transform: uppercase;
-        color: var(--oc-muted, #999);
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
       .icon-btn {
         flex: none;
         width: 22px;
@@ -60,7 +44,9 @@
       .icon-btn:hover:not(:disabled) { background: var(--oc-hover, rgba(127, 127, 127, 0.15)); color: var(--oc-fg, #ddd); }
       .icon-btn:disabled { opacity: 0.5; cursor: default; }
 
-      .active-row { min-width: 0; }
+      .active-row { display: flex; align-items: center; gap: 6px; min-width: 0; }
+      .active-row .preset-trigger { width: auto; flex: 1 1 auto; min-width: 0; }
+      .active-row .icon-btn { flex: none; }
       .preset-trigger {
         display: flex;
         align-items: center;
@@ -192,6 +178,18 @@
         color: var(--oc-muted, #999);
       }
       .model-content { flex: 0 0 auto; white-space: nowrap; }
+      /* Modell-ID wird bei Platzmangel links abgeschnitten, damit ihr Ende
+         und die Variante rechts immer sichtbar bleiben. */
+      .model-text .model-content {
+        flex: 1 1 auto;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        direction: rtl;
+        unicode-bidi: plaintext;
+        text-align: right;
+      }
       .variant {
         flex: 0 0 auto;
         padding: 0 5px;
@@ -451,6 +449,6 @@
   </head>
   <body>
     <div id="root"></div>
-    <script src="main.js?v=1.1.7"></script>
+    <script src="main.js?v=1.1.8"></script>
   </body>
 </html>

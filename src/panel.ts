@@ -559,20 +559,6 @@ const modelIsMissing = (audit: ModelAudit | null, model: string): boolean => (
 const paintReady = (panel: HTMLElement, model: ReadyModel): void => {
   const busy = interaction.kind === 'applying';
 
-  const head = element('div', 'head');
-  head.append(element('span', 'eyebrow', 'oh-my-opencode-slim'));
-  const refresh = element('button', 'icon-btn', '↻');
-  refresh.type = 'button';
-  refresh.title = 'Neu laden';
-  refresh.setAttribute('aria-label', 'Neu laden');
-  refresh.disabled = busy;
-  refresh.addEventListener('click', () => {
-    notice = null;
-    void loadAndPaint();
-  });
-  head.append(refresh);
-  panel.append(head);
-
   if (modelCheck.kind === 'done') paintMissingModelsBanner(panel, modelCheck.audit);
 
   if (interaction.kind === 'confirm' || interaction.kind === 'applying') {
@@ -616,6 +602,17 @@ const paintReady = (panel: HTMLElement, model: ReadyModel): void => {
 
   const activeRow = element('div', 'active-row');
   paintTrigger(activeRow, model, busy);
+  // Refresh (↻) direkt neben dem Preset-Selektor statt einer Eyebrow-Zeile oben.
+  const refresh = element('button', 'icon-btn', '↻');
+  refresh.type = 'button';
+  refresh.title = 'Neu laden';
+  refresh.setAttribute('aria-label', 'Neu laden');
+  refresh.disabled = busy;
+  refresh.addEventListener('click', () => {
+    notice = null;
+    void loadAndPaint();
+  });
+  activeRow.append(refresh);
   panel.append(activeRow);
 
   if (listOpen) paintPresetList(panel, model, busy);
