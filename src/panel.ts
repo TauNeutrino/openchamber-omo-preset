@@ -255,17 +255,8 @@ const agentRow = (agent: PresetAgent): HTMLElement => {
   if ((sessions.length || recent.length) && openAgent === key) {
     const list = element('div', 'session-list');
     list.setAttribute('aria-label', `${name}: aktive und letzte Sessions (8 Std)`);
-    const dismissTitle = 'Vorzeitig ausblenden (wirkt bis zur nächsten Aktivität)';
-    const eyeSlash = (): SVGSVGElement => {
-      // Augen-Icon mit Diagonalstrich: 12×12 viewBox, Kreisauge + Pupille.
-      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-      svg.setAttribute('viewBox', '0 0 24 24');
-      svg.setAttribute('aria-hidden', 'true');
-      svg.innerHTML = '<path d="M3 3l18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>'
-        + '<path d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12s-3.5 6.5-9.5 6.5S2.5 12 2.5 12Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>'
-        + '<circle cx="12" cy="12" r="2.5" fill="currentColor"/>';
-      return svg;
-    };
+    const dismissTitle = 'Ausblenden (bis zur nächsten Aktivität der Session)';
+    const eyeGlyph = (): HTMLElement => element('span', 'session-hide-glyph', '👁');
     const rows: { session: AgentSession; done: boolean }[] = [
       ...sessions.map((session) => ({ session, done: false })),
       ...recent.map((session) => ({ session, done: true })),
@@ -298,7 +289,7 @@ const agentRow = (agent: PresetAgent): HTMLElement => {
         hide.type = 'button';
         hide.title = dismissTitle;
         hide.setAttribute('aria-label', dismissTitle);
-        hide.append(eyeSlash());
+        hide.append(eyeGlyph());
         hide.addEventListener('click', (event) => {
           event.stopPropagation();
           dismissedSessions.add(session.id);

@@ -51,8 +51,10 @@ export const sameDirectory = (a: string, b: string): boolean => {
 /** Activities that mean the session is still doing something. */
 export const ACTIVE_ACTIVITIES = ['running', 'retrying', 'waiting-permission', 'waiting-question'] as const;
 
-const isActiveSession = (activity: GuestSessionRecord['activity']): boolean => (
-  (ACTIVE_ACTIVITIES as readonly string[]).includes(activity)
+const isSessionActive = (session: AgentSession): boolean => (
+  // Ein gesetztes outcome gewinnt: ein 'running', das kurz vor dem Snapshot
+  // endet, Parken in dieser Gruppe wäre falsch.
+  session.outcome == null && (ACTIVE_ACTIVITIES as readonly string[]).includes(session.activity)
 );
 
 /** Finished sessions stay listed this long after their last update. */
@@ -77,9 +79,9 @@ export const groupAgentSessions = (
     if (session.projectId !== projectId || !sameDirectory(session.directory, directory)
       || session.parentId === null || session.archivedAt !== null
       || (typeof session.agent !== 'string' || !session.agent.trim())) continue;
-    if (!isActiveSession(session.activity) && session.updatedAt < windowStart) continue;
+    if (!isSessionActive(session) && session.updatedAt < windowStart) continue;
     const entry = groups.get(session.agent) ?? { active: [], recent: [] };
-    if (isActiveSession(session.activity)) {
+    if (isSessionActive(session)) {
       entry.active.push(session);
     } else {
       entry.recent.push(session);
