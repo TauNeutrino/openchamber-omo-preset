@@ -21,6 +21,11 @@ type Dictionary = Record<string, string | ((...args: any[]) => string)>;
 
 const de: Dictionary = {
   restartHint: 'Wirksam nach Neustart des Managed Service (Settings → Apply & Restart).',
+  presetNameEmpty: 'Der Preset-Name darf nicht leer sein.',
+  configLabel: 'Die Konfiguration',
+  resultLabel: 'Das Ergebnis',
+  changeNotVerified: 'Die Änderung konnte nicht verifiziert werden; es wurde nichts geschrieben.',
+  presetsMapChanged: 'Die Änderung hätte die presets-Map verändert; es wurde nichts geschrieben.',
   noProjectOpen: 'Kein Projekt geöffnet.',
   accessNotGranted: 'Zugriff nicht freigegeben',
   fileTooLarge: 'Die Datei ist größer als das erlaubte Limit.',
@@ -98,6 +103,11 @@ const de: Dictionary = {
 
 const en: Dictionary = {
   restartHint: 'Effective after Managed Service restart (Settings → Apply & Restart).',
+  presetNameEmpty: 'The preset name must not be empty.',
+  configLabel: 'The configuration',
+  resultLabel: 'The result',
+  changeNotVerified: 'The change could not be verified; nothing was written.',
+  presetsMapChanged: 'The change would have modified the presets map; nothing was written.',
   noProjectOpen: 'No project open.',
   accessNotGranted: 'Access not granted',
   fileTooLarge: 'The file is larger than the allowed limit.',

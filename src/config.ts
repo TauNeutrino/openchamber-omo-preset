@@ -1,3 +1,4 @@
+import { t } from './i18n.ts';
 /**
  * Reading and rewriting of the oh-my-opencode-slim preset selection.
  *
@@ -189,10 +190,10 @@ const formattingFor = (content: string): FormattingOptions => {
 export const applyPresetToText = (raw: string, name: string): string => {
   const nextName = name.trim();
   if (!nextName) {
-    throw new Error('Der Preset-Name darf nicht leer sein.');
+    throw new Error(t('presetNameEmpty'));
   }
 
-  const before = parseConfigText(raw, 'Die Konfiguration');
+  const before = parseConfigText(raw, t('configLabel'));
   if (!before.ok) {
     throw new Error(before.error);
   }
@@ -213,15 +214,15 @@ export const applyPresetToText = (raw: string, name: string): string => {
     next = applyEdits(content, edits);
   }
 
-  const after = parseConfigText(next, 'Das Ergebnis');
+  const after = parseConfigText(next, t('resultLabel'));
   if (!after.ok) {
     throw new Error(`Die Änderung würde die Konfiguration beschädigen: ${after.error}`);
   }
   if (after.config.preset !== nextName) {
-    throw new Error('Die Änderung konnte nicht verifiziert werden; es wurde nichts geschrieben.');
+    throw new Error(t('changeNotVerified'));
   }
   if (JSON.stringify(after.config.presets) !== JSON.stringify(before.config.presets)) {
-    throw new Error('Die Änderung hätte die presets-Map verändert; es wurde nichts geschrieben.');
+    throw new Error(t('presetsMapChanged'));
   }
 
   return hasBom ? `${BOM}${next}` : next;
