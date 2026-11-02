@@ -76,8 +76,25 @@ let surface: HostReadyContext['surface'] = 'panel';
 let screen: Screen = { kind: 'loading' };
 let interaction: Interaction = { kind: 'browse' };
 let listOpen = false;
-let notice: Notice | null = null;
-let loadToken = 0;
+let noticeDismissTimer: ReturnType<typeof setTimeout> | null = null;
+
+const autoDismissNotice = (ms: number): void => {
+  if (noticeDismissTimer) clearTimeout(noticeDismissTimer);
+  noticeDismissTimer = setTimeout(() => {
+    noticeDismissTimer = null;
+    if (notice?.tone === 'success') {
+      notice = null;
+      paint();
+    }
+  }, ms);
+};
+
+const clearNoticeDismissTimer = (): void => {
+  if (noticeDismissTimer) {
+    clearTimeout(noticeDismissTimer);
+    noticeDismissTimer = null;
+  }
+};
 let heightFrame = 0;
 let mounted: Array<{ dispose: () => void }> = [];
 let agentSessions = new Map<string, AgentSessionGroups>();
@@ -718,6 +735,8 @@ const loadAndPaint = async (): Promise<void> => {
   const currentDirectory = directory;
   interaction = { kind: 'browse' };
   listOpen = false;
+  clearNoticeDismissTimer();
+  notice = null;
   screen = { kind: 'loading' };
   paint();
 
@@ -761,6 +780,7 @@ const switchSessionModel = async (sessionId: string, model: string): Promise<voi
     interaction = { kind: 'browse' };
     notice = { tone: 'success', title: 'Orchestrator-Modell umgestellt', body: model };
     paint();
+    autoDismissNotice(5000);
     void host.toast({ kind: 'success', message: `Orchestrator-Session auf ${model} umgestellt.` });
   } catch (error) {
     interaction = { kind: 'browse' };
@@ -861,6 +881,7 @@ const applyPreset = async (name: string): Promise<void> => {
     interaction = { kind: 'browse' };
     await loadAndPaint();
     void host.toast({ kind: 'success', message: `Preset „${name}“ gespeichert. ${RESTART_HINT}` });
+    autoDismissNotice(5000);
     // Wenn die aktuelle Session der Orchestrator ist: anbieten, dessen Modell umzustellen.
     if (currentSessionAgent === 'orchestrator' && currentSessionId && newOrchestratorModel) {
       interaction = {
