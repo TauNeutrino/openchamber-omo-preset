@@ -352,73 +352,10 @@
       .tree-state.is-live { color: var(--oc-info, #3fa9f5); }
       .tree-metadata { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--oc-mono, ui-monospace, monospace); }
 
-      .layers {
-        display: flex;
-        flex-direction: column;
-        gap: 1px;
-        margin-top: 1px;
-        padding-top: 6px;
-        border-top: 1px solid var(--oc-border, rgba(127, 127, 127, 0.28));
-      }
-      .layer {
-        display: flex;
-        align-items: baseline;
-        justify-content: space-between;
-        gap: 10px;
-        min-width: 0;
-        font-size: 11px;
-        color: var(--oc-muted, #999);
-      }
-      .layer strong {
-        min-width: 0;
-        max-width: 62%;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        font-weight: 500;
-        color: var(--oc-fg, #ddd);
-      }
-      .layer strong.is-empty { color: var(--oc-muted, #999); font-weight: 400; }
-
       /* Model availability: missing refs stand out on the agent row and in the check line. */
       .agent-group.is-missing .model-content { color: var(--oc-destructive, #f38ba8); }
       .agent-group.is-missing .agent-disclosure .agent-name { color: var(--oc-destructive, #f38ba8); }
       .agent-group.is-missing .agent-name { color: var(--oc-destructive, #f38ba8); }
-      .model-check {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 10px;
-        margin-top: 1px;
-        padding-top: 5px;
-        border-top: 1px dashed var(--oc-border, rgba(127, 127, 127, 0.22));
-        font-size: 11px;
-        color: var(--oc-muted, #999);
-      }
-      .model-check-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-      .model-check-label .is-ok { color: var(--oc-success, #a6e3a1); }
-      .model-check-label .is-missing { color: var(--oc-destructive, #f38ba8); }
-      .model-check-label .is-muted { color: var(--oc-muted, #999); }
-      .model-check-refresh {
-        flex: none;
-        border: 0;
-        background: none;
-        color: var(--oc-muted, #999);
-        cursor: pointer;
-        font-size: 12px;
-        line-height: 1;
-        padding: 2px 4px;
-      }
-      .model-check-refresh:hover:not(:disabled) { color: var(--oc-fg, #ddd); }
-      .model-check-refresh:disabled { opacity: 0.5; cursor: default; }
-
-      .hint {
-        margin: 0;
-        font-size: 11px;
-        line-height: 1.45;
-        color: var(--oc-muted, #999);
-      }
-
       .confirm {
         display: flex;
         flex-direction: column;
@@ -449,6 +386,6 @@
   </head>
   <body>
     <div id="root"></div>
-    <script src="main.js?v=1.1.9"></script>
+    <script src="main.js?v=1.1.10"></script>
   </body>
 </html>
