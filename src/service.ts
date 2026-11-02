@@ -86,6 +86,31 @@ const server = http.createServer(async (req, res) => {
       send(res, 200, { ok: true, catalog, checkedAt, source: 'opencode models' });
       return;
     }
+    if (url.pathname === '/switch-model' && req.method === 'POST') {
+      let body = '';
+      req.on('data', (chunk: Buffer) => { body += chunk.toString('utf8'); });
+      req.on('end', async () => {
+        try {
+          const parsed = JSON.parse(body || '{}') as { sessionId?: unknown; model?: unknown };
+          const sessionId = typeof parsed.sessionId === 'string' ? parsed.sessionId : '';
+          const model = typeof parsed.model === 'string' ? parsed.model : '';
+          if (!sessionId || !model) { send(res, 400, { ok: false, error: 'missing-args' }); return; }
+          const slash = model.indexOf('/');
+          if (slash <= 0) { send(res, 400, { ok: false, error: 'bad-model' }); return; }
+          const providerID = model.slice(0, slash);
+          const modelID = model.slice(slash + 1);
+          const args = ['api', 'POST', `/api/session/${sessionId}/model`, '-d', JSON.stringify({ model: { id: modelID, providerID, modelID } })];
+          await new Promise<void>((resolve, reject) => {
+            execFile(CLI_CANDIDATES()[0], args, { timeout: CLI_TIMEOUT_MS, windowsHide: true, maxBuffer: 1024 * 1024 },
+              (error, _stdout, stderr) => (error ? reject(new Error(stderr || error.message)) : resolve()));
+          });
+          send(res, 200, { ok: true });
+        } catch (error) {
+          send(res, 502, { ok: false, error: error instanceof Error ? error.message : String(error) });
+        }
+      });
+      return;
+    }
     send(res, 404, { ok: false, error: 'not-found' });
   } catch (error) {
     send(res, 502, { ok: false, error: error instanceof Error ? error.message : String(error) });

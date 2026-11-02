@@ -55,7 +55,8 @@ type Screen =
 type Interaction =
   | { kind: 'browse' }
   | { kind: 'confirm'; name: string }
-  | { kind: 'applying'; name: string };
+  | { kind: 'applying'; name: string }
+  | { kind: 'confirm-model-switch'; sessionId: string; model: string; presetName: string };
 
 type LayersRead =
   | { status: 'ready'; global: ParsedLayer; project: ParsedLayer | null }
@@ -82,6 +83,9 @@ let mounted: Array<{ dispose: () => void }> = [];
 let agentSessions = new Map<string, AgentSessionGroups>();
 /** Finished sessions hidden early (eye button); a new activity on a hidden session clears it. */
 const dismissedSessions = new Set<string>();
+/** Current OpenCode session, for optional model switching after a preset change. */
+let currentSessionId: string | null = null;
+let currentSessionAgent: string | null = null;
 let openAgent: string | undefined;
 let sessionsToken = 0;
 let projectLookupToken = 0;
@@ -424,6 +428,41 @@ const paintReady = (panel: HTMLElement, model: ReadyModel): void => {
 
   if (modelCheck.kind === 'done') paintMissingModelsBanner(panel, modelCheck.audit);
 
+  if (interaction.kind === 'confirm-model-switch') {
+    const card = element('div', 'confirm');
+    card.tabIndex = -1;
+    card.setAttribute('role', 'group');
+    card.setAttribute('aria-label', `Modell der Orchestrator-Session umstellen`);
+    card.append(element('div', 'confirm-title', `Orchestrator-Session umstellen?`));
+    const body = element('div', 'confirm-body');
+    body.append(
+      document.createTextNode('Die Preset-Änderung ist gespeichert. Soll die laufende Orchestrator-Session auf '),
+      element('code', '', interaction.model),
+      document.createTextNode(' umgestellt werden? (Wirksam ab dem nächsten Turn.)'),
+    );
+    card.append(body);
+    const actions = element('div', 'confirm-actions');
+    mounted.push(mountButton(actions, {
+      label: 'Nein',
+      variant: 'ghost',
+      size: 'sm',
+      onClick: () => {
+        interaction = { kind: 'browse' };
+        paint();
+      },
+    }));
+    mounted.push(mountButton(actions, {
+      label: 'Umstellen',
+      size: 'sm',
+      onClick: () => {
+        const { sessionId, model } = interaction as Extract<Interaction, { kind: 'confirm-model-switch' }>;
+        void switchSessionModel(sessionId, model);
+      },
+    }));
+    card.append(actions);
+    panel.append(card);
+    return;
+  }
   if (interaction.kind === 'confirm' || interaction.kind === 'applying') {
     const name = interaction.name;
     const target = resolveWriteTarget(model.global, model.project);
@@ -711,6 +750,25 @@ const loadAndPaint = async (): Promise<void> => {
   refreshModelCheck(auditRefsFor(resolved.view, layers.project));
 };
 
+const switchSessionModel = async (sessionId: string, model: string): Promise<void> => {
+  interaction = { kind: 'applying', name: 'Modell-Umstellung' };
+  paint();
+  try {
+    const result = await host.serviceRequest({ method: 'POST', path: '/switch-model', body: JSON.stringify({ sessionId, model }) });
+    if (result.status !== 200) throw new Error(`Service antwortete HTTP ${result.status}.`);
+    const answer = JSON.parse(result.body) as { ok?: boolean; error?: string };
+    if (!answer.ok) throw new Error(answer.error ?? 'Umstellung fehlgeschlagen.');
+    interaction = { kind: 'browse' };
+    notice = { tone: 'success', title: 'Orchestrator-Modell umgestellt', body: model };
+    paint();
+    void host.toast({ kind: 'success', message: `Orchestrator-Session auf ${model} umgestellt.` });
+  } catch (error) {
+    interaction = { kind: 'browse' };
+    notice = { tone: 'error', title: 'Modell-Umstellung fehlgeschlagen', body: errorText(error) };
+    paint();
+  }
+};
+
 const applyPreset = async (name: string): Promise<void> => {
   if (interaction.kind === 'applying') return;
   const model = screen.kind === 'ready' ? screen.model : null;
@@ -794,6 +852,8 @@ const applyPreset = async (name: string): Promise<void> => {
   try {
     const next = applyPresetToText(source.raw, name);
     await host.writeFile(target.path, next);
+    // Neues Orchestrator-Modell aus dem gewählten Preset ermitteln.
+    const newOrchestratorModel = orchestratorModel(model.view.presets, name);
     notice = {
       tone: 'success',
       title: `Preset „${name}“ gespeichert`,
@@ -801,6 +861,16 @@ const applyPreset = async (name: string): Promise<void> => {
     interaction = { kind: 'browse' };
     await loadAndPaint();
     void host.toast({ kind: 'success', message: `Preset „${name}“ gespeichert. ${RESTART_HINT}` });
+    // Wenn die aktuelle Session der Orchestrator ist: anbieten, dessen Modell umzustellen.
+    if (currentSessionAgent === 'orchestrator' && currentSessionId && newOrchestratorModel) {
+      interaction = {
+        kind: 'confirm-model-switch',
+        sessionId: currentSessionId,
+        model: newOrchestratorModel,
+        presetName: name,
+      };
+      paint();
+    }
   } catch (error) {
     interaction = { kind: 'browse' };
     notice = { tone: 'error', title: 'Preset wurde nicht geändert', body: errorText(error) };
@@ -858,4 +928,10 @@ host.onDirectory((next) => {
   directory = next;
   watchSessions(directory);
   void loadAndPaint();
+});
+
+host.onSession((next) => {
+  currentSessionId = next?.id ?? null;
+  currentSessionAgent = next?.agent ?? null;
+  if (didMount && !listOpen && interaction.kind === 'browse') paint();
 });
