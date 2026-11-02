@@ -220,7 +220,7 @@ const agentRow = (agent: PresetAgent): HTMLElement => {
     trigger.setAttribute('aria-label', `${name}: ${parts.join(', ')}${parts.length > 1 ? ' (letzte 8 Std)' : ''} — Zum Aufklappen`);
     trigger.append(...[
       sessions.length ? element('span', 'session-count', countGlyph(Math.min(sessions.length, 10)) + (sessions.length > 10 ? '+' : '')) : null,
-      recent.length ? element('span', 'session-count is-done', countGlyph(Math.min(recent.length, 10)) + (recent.length > 10 ? '+' : '')) : null,
+      recent.length ? element('span', 'session-count is-done', `${Math.min(recent.length, 9)}${recent.length > 9 ? '+' : ''}`) : null,
       element('span', 'agent-name', name),
       element('span', 'agent-chevron', openAgent === key ? '▴' : '▾'),
     ].filter((node): node is HTMLElement => node !== null));

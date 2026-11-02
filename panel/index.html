@@ -218,7 +218,20 @@
       .agent-disclosure:hover, .agent-disclosure[aria-expanded="true"] { background: var(--oc-hover, rgba(127, 127, 127, 0.15)); }
       .agent-disclosure .agent-name { max-width: none; }
       .session-count { flex: none; color: var(--oc-info, #3fa9f5); font-size: 12.5px; line-height: 1; }
-      .session-count.is-done { color: var(--oc-success, #a6e3a1); }
+      /* Fertige Sessions: Ziffer im Quadrat — Unicode kennt keine, also zeichnet
+         CSS den Rahmen (flexibles Rundeck statt Emoji-Keycaps). */
+      .session-count.is-done {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 13px;
+        height: 13px;
+        padding: 0 2px;
+        border: 1px solid var(--oc-success, #a6e3a1);
+        border-radius: 3.5px;
+        color: var(--oc-success, #a6e3a1);
+        font: 9.5px/1 var(--oc-mono, ui-monospace, monospace);
+      }
       .session-count sup { font-size: 9px; }
       .agent-chevron { flex: none; color: var(--oc-muted, #999); font-size: 9px; }
       /* Session-Baum: eingerückt unter dem Agenten, keine eigene Box,
@@ -437,6 +450,6 @@
   </head>
   <body>
     <div id="root"></div>
-    <script src="main.js?v=1.1.5"></script>
+    <script src="main.js?v=1.1.6"></script>
   </body>
 </html>
