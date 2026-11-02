@@ -77,6 +77,8 @@ let screen: Screen = { kind: 'loading' };
 let interaction: Interaction = { kind: 'browse' };
 let listOpen = false;
 let noticeDismissTimer: ReturnType<typeof setTimeout> | null = null;
+let notice: Notice | null = null;
+let loadToken = 0;
 
 const autoDismissNotice = (ms: number): void => {
   if (noticeDismissTimer) clearTimeout(noticeDismissTimer);
