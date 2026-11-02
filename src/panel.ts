@@ -22,6 +22,7 @@ import {
   type WriteTarget,
 } from './config.ts';
 import { countGlyph, groupAgentSessions, sameDirectory, type AgentSession, type AgentSessionGroups } from './sessions.ts';
+import { setLocale, t } from './i18n.ts';
 import { auditModelRefs, collectModelRefs, type ModelAudit } from './model-audit.ts';
 
 // The extension can see the global omo-slim config through the manifest's
@@ -36,7 +37,7 @@ const PROJECT_PATHS = [
   '.opencode/oh-my-opencode-slim.json',
   '.opencode/oh-my-opencode-slim.jsonc',
 ];
-const RESTART_HINT = 'Wirksam nach Neustart des Managed Service (Settings → Apply & Restart).';
+const restartHint = (): string => t('restartHint');
 
 type Notice = { tone: Extract<Tone, 'success' | 'warning' | 'error' | 'info'>; title: string; body?: string };
 
@@ -128,13 +129,13 @@ const errorText = (error: unknown): string => {
   if (error instanceof HostRequestError) {
     switch (error.code) {
       case 'NOT_GRANTED':
-        return `Zugriff nicht freigegeben (${error.message}).`;
+        return `${t('accessNotGranted')} (${error.message}).`;
       case 'NO_DIRECTORY':
-        return 'Kein Projekt geöffnet.';
+        return t('noProjectOpen');
       case 'BAD_PATH':
         return `Pfad nicht erlaubt (${error.message}).`;
       case 'FILE_TOO_LARGE':
-        return 'Die Datei ist größer als das erlaubte Limit.';
+        return t('fileTooLarge');
       default:
         return `${error.code}: ${error.message}`;
     }
@@ -172,13 +173,13 @@ const readLayer = async (
 const readLayers = async (projectDirectory: string | null): Promise<LayersRead> => {
   const global = await readLayer('global', GLOBAL_PATHS);
   if (global.kind === 'failed') {
-    return { status: 'failed', title: 'Globale Konfiguration nicht lesbar', detail: global.message };
+    return { status: 'failed', title: t('globalConfigUnreadable'), detail: global.message };
   }
   if (global.kind === 'missing') {
     return {
       status: 'failed',
-      title: 'Keine oh-my-opencode-slim-Konfiguration gefunden',
-      detail: `Weder ${GLOBAL_PATHS[0]} noch ${GLOBAL_PATHS[1]} existiert. Ohne Datei wird nichts geschrieben.`,
+      title: t('noConfigFound'),
+      detail: t('noConfigDetail', GLOBAL_PATHS[0], GLOBAL_PATHS[1]),
     };
   }
 
@@ -186,7 +187,7 @@ const readLayers = async (projectDirectory: string | null): Promise<LayersRead> 
   if (projectDirectory) {
     const read = await readLayer('project', PROJECT_PATHS);
     if (read.kind === 'failed') {
-      return { status: 'failed', title: 'Projekt-Override nicht lesbar', detail: read.message };
+      return { status: 'failed', title: t('projectOverrideUnreadable'), detail: read.message };
     }
     if (read.kind === 'loaded') project = read.layer;
   }
@@ -234,8 +235,8 @@ const agentRow = (agent: PresetAgent): HTMLElement => {
     trigger.type = 'button';
     trigger.dataset.agent = key;
     trigger.setAttribute('aria-expanded', String(openAgent === key));
-    const parts = [`${sessions.length} aktiv`];
-    if (recent.length) parts.push(`${recent.length} letzte`);
+    const parts = [t('activeSessions', sessions.length)];
+    if (recent.length) parts.push(t('recentSessions', recent.length));
     trigger.setAttribute('aria-label', `${name}: ${parts.join(', ')}${parts.length > 1 ? ' (letzte 8 Std)' : ''} — Zum Aufklappen`);
     trigger.append(...[
       sessions.length ? element('span', 'session-count', countGlyph(Math.min(sessions.length, 10)) + (sessions.length > 10 ? '+' : '')) : null,
@@ -268,13 +269,13 @@ const agentRow = (agent: PresetAgent): HTMLElement => {
     value.append(variant);
   }
   value.title = `${agent.agent} · ${agent.model}${agent.variant ? ` (${agent.variant})` : ''}`
-    + (missing ? ' · Modell nicht im Katalog gefunden' : '');
+    + (missing ? t('modelNotFoundInCatalog') : '');
   row.append(value);
   group.append(row);
   if ((sessions.length || recent.length) && openAgent === key) {
     const list = element('div', 'session-list');
-    list.setAttribute('aria-label', `${name}: aktive und letzte Sessions (8 Std)`);
-    const dismissTitle = 'Ausblenden (bis zur nächsten Aktivität der Session)';
+    list.setAttribute('aria-label', `${name}: ${t('activeAndRecentSessions')}`);
+    const dismissTitle = t('hideSession');
     const eyeGlyph = (): HTMLElement => element('span', 'session-hide-glyph', '👁');
     const rows: { session: AgentSession; done: boolean }[] = [
       ...sessions.map((session) => ({ session, done: false })),
@@ -285,7 +286,7 @@ const agentRow = (agent: PresetAgent): HTMLElement => {
       option.dataset.session = session.id;
       const open = element('button', 'session-open');
       open.type = 'button';
-      const label = element('span', 'session-title', session.title || 'Session ohne Titel');
+      const label = element('span', 'session-title', session.title || t('sessionWithoutTitle'));
       open.title = session.title;
       open.append(label);
       if (done) {
@@ -294,14 +295,14 @@ const agentRow = (agent: PresetAgent): HTMLElement => {
         const when = relativeTime(session.updatedAt);
         open.append(element('span', 'session-activity', outcome ? `${outcome} ${when}` : when));
       } else {
-        const activity = session.activity === 'waiting-permission' ? 'Warten auf Freigabe'
-          : session.activity === 'waiting-question' ? 'Warten auf Antwort'
-            : session.activity === 'retrying' ? 'Erneuter Versuch' : '';
+        const activity = session.activity === 'waiting-permission' ? t('waitingForApproval')
+          : session.activity === 'waiting-question' ? t('waitingForAnswer')
+            : session.activity === 'retrying' ? t('retrying') : '';
         if (activity) open.append(element('span', 'session-activity', activity));
         const elapsed = element('span', 'session-activity is-live');
         elapsed.dataset.elapsedStart = String(session.createdAt);
         elapsed.textContent = formatDuration(Date.now() - session.createdAt);
-        elapsed.title = 'Laufzeit seit Erstellung';
+        elapsed.title = t('runtimeSinceCreation');
         open.append(elapsed);
       }
       open.addEventListener('click', () => {
@@ -339,11 +340,11 @@ const agentRow = (agent: PresetAgent): HTMLElement => {
 
 const relativeTime = (timestamp: number): string => {
   const minutes = Math.max(0, Math.floor((Date.now() - timestamp) / 60_000));
-  if (minutes < 1) return 'gerade eben';
-  if (minutes < 60) return `vor ${minutes} Min`;
+  if (minutes < 1) return t('justNow');
+  if (minutes < 60) return t('minutesAgo', minutes);
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `vor ${hours} Std`;
-  return `vor ${Math.floor(hours / 24)} Tagen`;
+  if (hours < 24) return t('hoursAgo', hours);
+  return t('daysAgo', Math.floor(hours / 24));
 };
 
 /** Kompakte Laufzeit wie in OpenChamber selbst: 45s, 1m 3s, 2h 15m. */
@@ -367,7 +368,7 @@ const paintPresetList = (parent: Element, model: ReadyModel, busy: boolean): voi
   const list = element('div', 'preset-list');
   list.id = 'omo-preset-list';
   list.setAttribute('role', 'listbox');
-  list.setAttribute('aria-label', 'Verfügbare Presets');
+  list.setAttribute('aria-label', t('availablePresets'));
 
   for (const name of names) {
     const active = name === model.view.active.name;
@@ -410,10 +411,10 @@ const paintTrigger = (parent: Element, model: ReadyModel, busy: boolean): void =
   trigger.setAttribute('aria-expanded', listOpen ? 'true' : 'false');
   trigger.setAttribute('aria-controls', 'omo-preset-list');
   trigger.disabled = busy;
-  trigger.title = 'Preset wechseln';
+  trigger.title = t('switchPreset');
   trigger.append(element('span', 'preset-name', model.view.active.name));
   mounted.push(mountBadge(trigger, {
-    label: model.view.active.origin === 'project' ? 'Projekt' : 'Global',
+    label: model.view.active.origin === 'project' ? t('projectLayer') : t('globalLayer'),
     tone: model.view.active.origin === 'project' ? 'info' : 'neutral',
   }));
   trigger.append(element('span', 'chevron', listOpen ? '▴' : '▾'));
@@ -429,12 +430,11 @@ const paintMissingModelsBanner = (panel: HTMLElement, audit: ModelAudit): void =
   const when = audit.checkedAt
     ? new Date(audit.checkedAt).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
     : null;
-  const body = audit.missing.map((entry) => entry.ref).join(', ')
-    + (when ? ` — geprüft ${when}` : '');
+  const refs = audit.missing.map((entry) => entry.ref).join(', ');
   mounted.push(mountBanner(panel, {
     tone: 'error',
-    title: `${audit.missing.length} konfiguriertes Modell${audit.missing.length === 1 ? '' : 'e'} ${audit.missing.length === 1 ? 'ist' : 'sind'} nicht mehr im Modellkatalog`,
-    body,
+    title: t('missingModelsBannerTitle', audit.missing.length),
+    body: refs + (when ? ` — ${t('checkedAt', when)}` : ''),
   }));
 };
 
@@ -451,18 +451,22 @@ const paintReady = (panel: HTMLElement, model: ReadyModel): void => {
     const card = element('div', 'confirm');
     card.tabIndex = -1;
     card.setAttribute('role', 'group');
-    card.setAttribute('aria-label', `Modell der Orchestrator-Session umstellen`);
-    card.append(element('div', 'confirm-title', `Orchestrator-Session umstellen?`));
+    card.setAttribute('aria-label', t('orchestratorSessionSwitchTitle'));
+    card.append(element('div', 'confirm-title', t('orchestratorSessionSwitchTitle')));
     const body = element('div', 'confirm-body');
-    body.append(
-      document.createTextNode('Die Preset-Änderung ist gespeichert. Soll die laufende Orchestrator-Session auf '),
-      element('code', '', interaction.model),
-      document.createTextNode(' umgestellt werden? (Wirksam ab dem nächsten Turn.)'),
-    );
+    const full = t('orchestratorSessionSwitchBody', interaction.model);
+    const idx = full.indexOf(interaction.model);
+    if (idx >= 0) {
+      body.append(document.createTextNode(full.slice(0, idx)));
+      body.append(element('code', '', interaction.model));
+      body.append(document.createTextNode(full.slice(idx + interaction.model.length)));
+    } else {
+      body.append(document.createTextNode(full));
+    }
     card.append(body);
     const actions = element('div', 'confirm-actions');
     mounted.push(mountButton(actions, {
-      label: 'Nein',
+      label: t('no'),
       variant: 'ghost',
       size: 'sm',
       onClick: () => {
@@ -471,7 +475,7 @@ const paintReady = (panel: HTMLElement, model: ReadyModel): void => {
       },
     }));
     mounted.push(mountButton(actions, {
-      label: 'Umstellen',
+      label: t('switchModel'),
       size: 'sm',
       onClick: () => {
         const { sessionId, model } = interaction as Extract<Interaction, { kind: 'confirm-model-switch' }>;
@@ -488,20 +492,24 @@ const paintReady = (panel: HTMLElement, model: ReadyModel): void => {
     const card = element('div', 'confirm');
     card.tabIndex = -1;
     card.setAttribute('role', 'group');
-    card.setAttribute('aria-label', `Preset ${name} anwenden`);
-    card.append(element('div', 'confirm-title', `Preset „${name}“ anwenden?`));
+    card.setAttribute('aria-label', `${t('apply')} ${name}`);
+    card.append(element('div', 'confirm-title', t('applyPresetTitle', name)));
     const body = element('div', 'confirm-body');
-    body.append(
-      document.createTextNode('Schreibt ausschließlich den Schlüssel '),
-      element('code', '', 'preset'),
-      document.createTextNode(` in ${target.path}. Die presets-Map, Kommentare und alle anderen Inhalte bleiben unverändert.`),
-    );
+    const bodyText = t('applyPresetBody', target.path);
+    const presetIdx = bodyText.indexOf('preset');
+    if (presetIdx >= 0) {
+      body.append(document.createTextNode(bodyText.slice(0, presetIdx)));
+      body.append(element('code', '', 'preset'));
+      body.append(document.createTextNode(bodyText.slice(presetIdx + 'preset'.length)));
+    } else {
+      body.append(document.createTextNode(bodyText));
+    }
     card.append(body);
-    card.append(element('div', 'confirm-hint', RESTART_HINT));
+    card.append(element('div', 'confirm-hint', restartHint()));
 
     const actions = element('div', 'confirm-actions');
     mounted.push(mountButton(actions, {
-      label: 'Abbrechen',
+      label: t('cancel'),
       variant: 'ghost',
       size: 'sm',
       disabled: busy,
@@ -511,7 +519,7 @@ const paintReady = (panel: HTMLElement, model: ReadyModel): void => {
       },
     }));
     mounted.push(mountButton(actions, {
-      label: 'Anwenden',
+      label: t('apply'),
       size: 'sm',
       loading: busy,
       onClick: () => { void applyPreset(name); },
@@ -526,8 +534,8 @@ const paintReady = (panel: HTMLElement, model: ReadyModel): void => {
   // Refresh (↻) direkt neben dem Preset-Selektor statt einer Eyebrow-Zeile oben.
   const refresh = element('button', 'icon-btn', '↻');
   refresh.type = 'button';
-  refresh.title = 'Neu laden';
-  refresh.setAttribute('aria-label', 'Neu laden');
+  refresh.title = t('reload');
+  refresh.setAttribute('aria-label', t('reload'));
   refresh.disabled = busy;
   refresh.addEventListener('click', () => {
     notice = null;
@@ -542,7 +550,7 @@ const paintReady = (panel: HTMLElement, model: ReadyModel): void => {
 
   const agents = element('div', 'agents');
   if (model.view.agents.length === 0) {
-    agents.append(element('div', 'agents-empty', 'Für dieses Preset sind keine Agenten konfiguriert.'));
+    agents.append(element('div', 'agents-empty', t('noAgentsConfigured')));
   } else {
     for (const agent of model.view.agents) agents.append(agentRow(agent));
   }
@@ -551,7 +559,7 @@ const paintReady = (panel: HTMLElement, model: ReadyModel): void => {
 
 const paintLoading = (panel: HTMLElement): void => {
   const box = element('div', 'loading');
-  mounted.push(mountSpinner(box, { label: 'Presets werden geladen' }));
+  mounted.push(mountSpinner(box, { label: t('presetsLoading') }));
   panel.append(box);
 };
 
@@ -561,7 +569,7 @@ const paintFailed = (panel: HTMLElement, failed: Extract<Screen, { kind: 'failed
     title: failed.title,
     body: failed.detail,
     action: {
-      label: 'Erneut laden',
+      label: t('reload'),
       onClick: () => {
         notice = null;
         void loadAndPaint();
@@ -705,9 +713,9 @@ const refreshModelCheck = (refs: readonly string[], options: { background?: bool
   }
   void host.serviceRequest({ method: 'GET', path: '/models' })
     .then((result) => {
-      if (result.status !== 200) throw new Error(`Service antwortete HTTP ${result.status}.`);
+      if (result.status !== 200) throw new Error(t('serviceHttpError', result.status));
       const answer = JSON.parse(result.body) as { ok?: boolean; catalog?: unknown; checkedAt?: string };
-      if (!answer.ok || !Array.isArray(answer.catalog)) throw new Error('Katalogantwort unverständlich.');
+      if (!answer.ok || !Array.isArray(answer.catalog)) throw new Error(t('catalogResponseUnintelligible'));
       const audit = auditModelRefs(refs, answer.catalog as string[], answer.checkedAt ?? null);
       modelCheck = { kind: 'done', audit };
       paint();
@@ -753,7 +761,7 @@ const loadAndPaint = async (): Promise<void> => {
 
   const resolved = resolvePresetView(layers.global, layers.project);
   if (!resolved.ok) {
-    screen = { kind: 'failed', title: 'Preset-Konfiguration ungültig', detail: resolved.error };
+    screen = { kind: 'failed', title: t('invalidPresetConfig'), detail: resolved.error };
     paint();
     return;
   }
@@ -772,7 +780,7 @@ const loadAndPaint = async (): Promise<void> => {
 };
 
 const switchSessionModel = async (sessionId: string, model: string): Promise<void> => {
-  interaction = { kind: 'applying', name: 'Modell-Umstellung' };
+  interaction = { kind: 'applying', name: t('modelSwitching') };
   paint();
   try {
     const result = await host.serviceRequest({ method: 'POST', path: '/switch-model', body: JSON.stringify({ sessionId, model }) });
@@ -780,13 +788,13 @@ const switchSessionModel = async (sessionId: string, model: string): Promise<voi
     const answer = JSON.parse(result.body) as { ok?: boolean; error?: string };
     if (!answer.ok) throw new Error(answer.error ?? 'Umstellung fehlgeschlagen.');
     interaction = { kind: 'browse' };
-    notice = { tone: 'success', title: 'Orchestrator-Modell umgestellt', body: model };
+    notice = { tone: 'success', title: t('modelSwitched'), body: model };
     paint();
     autoDismissNotice(5000);
-    void host.toast({ kind: 'success', message: `Orchestrator-Session auf ${model} umgestellt.` });
+    void host.toast({ kind: 'success', message: t('switchFailedToast', model) });
   } catch (error) {
     interaction = { kind: 'browse' };
-    notice = { tone: 'error', title: 'Modell-Umstellung fehlgeschlagen', body: errorText(error) };
+    notice = { tone: 'error', title: t('modelSwitchFailed'), body: errorText(error) || t('modelSwitchFailedDetail') };
     paint();
   }
 };
@@ -810,7 +818,7 @@ const applyPreset = async (name: string): Promise<void> => {
     interaction = { kind: 'browse' };
     screen = {
       kind: 'failed',
-      title: 'Preset wurde nicht geändert',
+      title: t('presetNotChanged'),
       detail: `${layers.title}: ${layers.detail}`,
     };
     paint();
@@ -819,7 +827,7 @@ const applyPreset = async (name: string): Promise<void> => {
   const resolved = resolvePresetView(layers.global, layers.project);
   if (!resolved.ok) {
     interaction = { kind: 'browse' };
-    screen = { kind: 'failed', title: 'Preset wurde nicht geändert', detail: resolved.error };
+    screen = { kind: 'failed', title: t('presetNotChanged'), detail: resolved.error };
     paint();
     return;
   }
@@ -829,8 +837,8 @@ const applyPreset = async (name: string): Promise<void> => {
     interaction = { kind: 'browse' };
     notice = {
       tone: 'error',
-      title: 'Preset wurde nicht geändert',
-      body: 'Die aktive Ebene hat sich inzwischen geändert. Bitte erneut auswählen.',
+      title: t('presetNotChanged'),
+      body: t('activeLayerChanged'),
     };
     screen = { kind: 'ready', model: { ...model, global: layers.global, project: layers.project, view: resolved.view } };
     paint();
@@ -840,8 +848,8 @@ const applyPreset = async (name: string): Promise<void> => {
     interaction = { kind: 'browse' };
     notice = {
       tone: 'error',
-      title: 'Preset wurde nicht geändert',
-      body: `Preset "${name}" ist in ${target.path} nicht definiert. Es wurde nichts geschrieben.`,
+      title: t('presetNotChanged'),
+      body: t('presetNotDefined', name, target.path),
     };
     screen = { kind: 'ready', model: { ...model, global: layers.global, project: layers.project, view: resolved.view } };
     paint();
@@ -851,8 +859,8 @@ const applyPreset = async (name: string): Promise<void> => {
     interaction = { kind: 'browse' };
     notice = {
       tone: 'error',
-      title: 'Preset wurde nicht geändert',
-      body: 'Das geöffnete Projekt hat sich während der Bestätigung geändert. Bitte erneut auswählen.',
+      title: t('presetNotChanged'),
+      body: t('projectChanged'),
     };
     screen = { kind: 'ready', model: { ...model, global: layers.global, project: layers.project, view: resolved.view } };
     paint();
@@ -864,7 +872,7 @@ const applyPreset = async (name: string): Promise<void> => {
     interaction = { kind: 'browse' };
     screen = {
       kind: 'failed',
-      title: 'Preset wurde nicht geändert',
+      title: t('presetNotChanged'),
       detail: `${target.path} wurde nicht gefunden.`,
     };
     paint();
@@ -882,7 +890,7 @@ const applyPreset = async (name: string): Promise<void> => {
     };
     interaction = { kind: 'browse' };
     await loadAndPaint();
-    void host.toast({ kind: 'success', message: `Preset „${name}“ gespeichert. ${RESTART_HINT}` });
+    void host.toast({ kind: 'success', message: `Preset „${name}“ gespeichert. ${restartHint()}` });
     autoDismissNotice(5000);
     // Wenn die aktuelle Session der Orchestrator ist: anbieten, dessen Modell umzustellen.
     if (currentSessionAgent === 'orchestrator' && currentSessionId && newOrchestratorModel) {
@@ -896,7 +904,7 @@ const applyPreset = async (name: string): Promise<void> => {
     }
   } catch (error) {
     interaction = { kind: 'browse' };
-    notice = { tone: 'error', title: 'Preset wurde nicht geändert', body: errorText(error) };
+    notice = { tone: 'error', title: t('presetNotChanged'), body: errorText(error) };
     screen = { kind: 'ready', model };
     paint();
   }
@@ -930,6 +938,7 @@ document.addEventListener('click', (event) => {
 let didMount = false;
 host.onReady((ctx) => {
   applyHostReady(ctx, document.documentElement);
+  setLocale(ctx.locale);
   surface = ctx.surface;
   const nextDirectory = ctx.directory;
   if (!didMount) {

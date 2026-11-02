@@ -1,0 +1,189 @@
+/**
+ * Minimal i18n for the oMo Slim Preset Selector extension.
+ *
+ * The locale comes from OpenChamber's `HostReadyContext.locale`. We only ship
+ * German and English; anything that does not start with "de" falls back to
+ * English. Missing keys fall back to the key itself so a typo is visible
+ * instead of silently blank.
+ */
+
+type Locale = 'de' | 'en';
+
+let locale: Locale = 'en';
+
+export const setLocale = (value: string | null | undefined): void => {
+  locale = (value ?? '').toLowerCase().startsWith('de') ? 'de' : 'en';
+};
+
+export const getLocale = (): Locale => locale;
+
+type Dictionary = Record<string, string | ((...args: any[]) => string)>;
+
+const de: Dictionary = {
+  restartHint: 'Wirksam nach Neustart des Managed Service (Settings → Apply & Restart).',
+  noProjectOpen: 'Kein Projekt geöffnet.',
+  accessNotGranted: 'Zugriff nicht freigegeben',
+  fileTooLarge: 'Die Datei ist größer als das erlaubte Limit.',
+  notAFile: (p: string, k: string) => `${p} ist keine Datei (${k}).`,
+  unreadable: (p: string, e: string) => `${p}: ${e}`,
+  globalConfigUnreadable: 'Globale Konfiguration nicht lesbar',
+  noConfigFound: 'Keine oh-my-opencode-slim-Konfiguration gefunden',
+  noConfigDetail: (a: string, b: string) => `Weder ${a} noch ${b} existiert. Ohne Datei wird nichts geschrieben.`,
+  projectOverrideUnreadable: 'Projekt-Override nicht lesbar',
+  invalidPresetConfig: 'Preset-Konfiguration ungültig',
+  noAgentsConfigured: 'Für dieses Preset sind keine Agenten konfiguriert.',
+  presetsLoading: 'Presets werden geladen',
+  reload: 'Neu laden',
+  switchPreset: 'Preset wechseln',
+  availablePresets: 'Verfügbare Presets',
+  applyPresetTitle: (name: string) => `Preset „${name}“ anwenden?`,
+  applyPresetBody: (path: string) => `Schreibt ausschließlich den Schlüssel preset in ${path}. Die presets-Map, Kommentare und alle anderen Inhalte bleiben unverändert.`,
+  apply: 'Anwenden',
+  cancel: 'Abbrechen',
+  presetSaved: (name: string) => `Preset „${name}“ gespeichert`,
+  presetNotChanged: 'Preset wurde nicht geändert',
+  activeLayerChanged: 'Die aktive Ebene hat sich inzwischen geändert. Bitte erneut auswählen.',
+  presetNotDefined: (name: string, path: string) => `Preset "${name}" ist in ${path} nicht definiert. Es wurde nichts geschrieben.`,
+  projectChanged: 'Das geöffnete Projekt hat sich während der Bestätigung geändert. Bitte erneut auswählen.',
+  fileNotFound: (path: string) => `${path} wurde nicht gefunden.`,
+  sessionOpenFailed: (e: string) => `Session konnte nicht geöffnet werden: ${e}`,
+  missingModelsBannerTitle: (n: number) => `${n} konfiguriertes Modell${n === 1 ? '' : 'e'} ${n === 1 ? 'ist' : 'sind'} nicht mehr im Modellkatalog`,
+  missingModelsBannerBody: (refs: string, when: string | null) => refs + (when ? ` — geprüft ${when}` : ''),
+  modelCheckLabel: 'Modelle werden geprüft …',
+  modelCheckUnavailable: 'Modellprüfung nicht verfügbar (Service nicht freigegeben).',
+  modelCheckFailed: (msg: string) => `Modellprüfung fehlgeschlagen: ${msg}`,
+  catalogResponseUnintelligible: 'Katalogantwort unverständlich.',
+  serviceHttpError: (status: number) => `Service antwortete HTTP ${status}.`,
+  checkedAt: (when: string) => `geprüft ${when}`,
+  noModelsConfigured: 'Keine Modelle konfiguriert.',
+  notYetChecked: 'Noch nicht geprüft.',
+  allModelsAvailable: (n: number) => `✓ Alle ${n} konfigurierten Modelle verfügbar`,
+  modelsMissing: (missing: number, checked: number) => `⚠ ${missing} von ${checked} Modellen fehlen im Katalog`,
+  modelNotFoundInCatalog: ' · Modell nicht im Katalog gefunden',
+  hideSession: 'Ausblenden (bis zur nächsten Aktivität der Session)',
+  activeSessions: (n: number) => `${n} aktiv`,
+  recentSessions: (n: number) => `${n} letzte`,
+  activeAndRecentSessions: 'aktive und letzte Sessions (8 Std)',
+  sessionWithoutTitle: 'Session ohne Titel',
+  waitingForApproval: 'Warten auf Freigabe',
+  waitingForAnswer: 'Warten auf Antwort',
+  retrying: 'Erneuter Versuch',
+  runtimeSinceCreation: 'Laufzeit seit Erstellung',
+  orchestratorSessionSwitchTitle: 'Orchestrator-Session umstellen?',
+  orchestratorSessionSwitchBody: (model: string) => `Die Preset-Änderung ist gespeichert. Soll die laufende Orchestrator-Session auf ${model} umgestellt werden? (Wirksam ab dem nächsten Turn.)`,
+  switchModel: 'Umstellen',
+  no: 'Nein',
+  modelSwitched: 'Orchestrator-Modell umgestellt',
+  modelSwitching: 'Modell-Umstellung',
+  modelSwitchFailed: 'Modell-Umstellung fehlgeschlagen',
+  modelSwitchFailedDetail: 'Umstellung fehlgeschlagen.',
+  switchFailedToast: (model: string) => `Orchestrator-Session auf ${model} umgestellt.`,
+  justNow: 'gerade eben',
+  minutesAgo: (n: number) => `vor ${n} Min`,
+  hoursAgo: (n: number) => `vor ${n} Std`,
+  daysAgo: (n: number) => `vor ${n} Tagen`,
+  currentSession: 'Aktuelle Session',
+  directSubsessions: (n: number) => `${n} direkte Subsessions`,
+  expand: 'einklappen',
+  collapse: 'ausklappen',
+  running: 'Läuft',
+  repetition: 'Wiederholung',
+  completed: '✓ Abgeschlossen',
+  failed: '× Fehlgeschlagen',
+  projectLayer: 'Projekt',
+  globalLayer: 'Global',
+  noProjectOpenTitle: 'Kein Projekt geöffnet',
+  orchestratorModelHint: (m: string) => m,
+};
+
+const en: Dictionary = {
+  restartHint: 'Effective after Managed Service restart (Settings → Apply & Restart).',
+  noProjectOpen: 'No project open.',
+  accessNotGranted: 'Access not granted',
+  fileTooLarge: 'The file is larger than the allowed limit.',
+  notAFile: (p: string, k: string) => `${p} is not a file (${k}).`,
+  unreadable: (p: string, e: string) => `${p}: ${e}`,
+  globalConfigUnreadable: 'Global configuration not readable',
+  noConfigFound: 'No oh-my-opencode-slim configuration found',
+  noConfigDetail: (a: string, b: string) => `Neither ${a} nor ${b} exists. Without a file nothing is written.`,
+  projectOverrideUnreadable: 'Project override not readable',
+  invalidPresetConfig: 'Preset configuration invalid',
+  noAgentsConfigured: 'No agents configured for this preset.',
+  presetsLoading: 'Loading presets',
+  reload: 'Reload',
+  switchPreset: 'Switch preset',
+  availablePresets: 'Available presets',
+  applyPresetTitle: (name: string) => `Apply preset „${name}“?`,
+  applyPresetBody: (path: string) => `Writes only the key preset to ${path}. The presets map, comments and all other contents stay unchanged.`,
+  apply: 'Apply',
+  cancel: 'Cancel',
+  presetSaved: (name: string) => `Preset „${name}“ saved`,
+  presetNotChanged: 'Preset was not changed',
+  activeLayerChanged: 'The active layer changed in the meantime. Please select again.',
+  presetNotDefined: (name: string, path: string) => `Preset "${name}" is not defined in ${path}. Nothing was written.`,
+  projectChanged: 'The open project changed during confirmation. Please select again.',
+  fileNotFound: (path: string) => `${path} was not found.`,
+  sessionOpenFailed: (e: string) => `Session could not be opened: ${e}`,
+  missingModelsBannerTitle: (n: number) => `${n} configured model${n === 1 ? '' : 's'} ${n === 1 ? 'is' : 'are'} no longer in the model catalog`,
+  missingModelsBannerBody: (refs: string, when: string | null) => refs + (when ? ` — checked ${when}` : ''),
+  modelCheckLabel: 'Checking models …',
+  modelCheckUnavailable: 'Model check unavailable (service not granted).',
+  modelCheckFailed: (msg: string) => `Model check failed: ${msg}`,
+  catalogResponseUnintelligible: 'Catalog response unintelligible.',
+  serviceHttpError: (status: number) => `Service responded HTTP ${status}.`,
+  checkedAt: (when: string) => `checked ${when}`,
+  noModelsConfigured: 'No models configured.',
+  notYetChecked: 'Not checked yet.',
+  allModelsAvailable: (n: number) => `✓ All ${n} configured models available`,
+  modelsMissing: (missing: number, checked: number) => `⚠ ${missing} of ${checked} models missing from catalog`,
+  modelNotFoundInCatalog: ' · Model not found in catalog',
+  hideSession: 'Hide (until the session becomes active again)',
+  activeSessions: (n: number) => `${n} active`,
+  recentSessions: (n: number) => `${n} recent`,
+  activeAndRecentSessions: 'active and recent sessions (8 h)',
+  sessionWithoutTitle: 'Session without title',
+  waitingForApproval: 'Waiting for approval',
+  waitingForAnswer: 'Waiting for answer',
+  retrying: 'Retrying',
+  runtimeSinceCreation: 'Runtime since creation',
+  orchestratorSessionSwitchTitle: 'Switch orchestrator session?',
+  orchestratorSessionSwitchBody: (model: string) => `The preset change is saved. Switch the running orchestrator session to ${model}? (Effective from the next turn.)`,
+  switchModel: 'Switch',
+  no: 'No',
+  modelSwitched: 'Orchestrator model switched',
+  modelSwitching: 'Model switch',
+  modelSwitchFailed: 'Model switch failed',
+  modelSwitchFailedDetail: 'Switch failed.',
+  switchFailedToast: (model: string) => `Orchestrator session switched to ${model}.`,
+  justNow: 'just now',
+  minutesAgo: (n: number) => `${n} min ago`,
+  hoursAgo: (n: number) => `${n} h ago`,
+  daysAgo: (n: number) => `${n} d ago`,
+  currentSession: 'Current session',
+  directSubsessions: (n: number) => `${n} direct sub-sessions`,
+  expand: 'collapse',
+  collapse: 'expand',
+  running: 'Running',
+  repetition: 'Retrying',
+  completed: '✓ Completed',
+  failed: '× Failed',
+  projectLayer: 'Project',
+  globalLayer: 'Global',
+  noProjectOpenTitle: 'No project open',
+  orchestratorModelHint: (m: string) => m,
+};
+
+const dictionaries: Record<Locale, Dictionary> = { de, en };
+
+export const t = (key: string, ...args: unknown[]): string => {
+  const dict = dictionaries[locale];
+  const value = dict[key] ?? dictionaries.en[key] ?? key;
+  if (typeof value === 'function') {
+    try {
+      return (value as (...a: unknown[]) => string)(...args);
+    } catch {
+      return key;
+    }
+  }
+  return String(value);
+};
