@@ -19,7 +19,7 @@ Es gibt keine Remote-Installation und keinen eigenen Service. Das Manifest dekla
 ## Verhalten
 
 ### Modellprüfung
-Das Panel prüft nach jedem Laden (und dann alle 15 Minuten), ob die konfigurierten Modelle im effektiven Modellkatalog existieren. Der Katalog kommt von einem Local-Service der Extension (host-gemanagt, startet beim ersten `serviceRequest`), der `opencode models` befragt — keine Hintergrundlast außer bei Bedarf, 60-Sekunden-Cache. Fehlende Modelle werden an der Agenten-Zeile rot markiert und oben als Warnung zusammengefasst; die Gesamtzeile unten zeigt den Prüfstand mit Erneut-Prüfen-Button. Bei der Aktualisierung fragt OpenChamber einmal die neue Service-Berechtigung ab (`exec: opencode`).
+Das Panel prüft nach jedem Laden (und dann alle 15 Minuten), ob die konfigurierten Modelle im effektiven Modellkatalog existieren. Der Katalog kommt von einem Local-Service der Extension (host-gemanagt, startet beim ersten `serviceRequest`), der `opencode models` befragt — keine Hintergrundlast außer bei Bedarf, 60-Sekunden-Cache. Fehlende Modelle werden an der Agenten-Zeile rot markiert und oben als Warnung zusammengefasst. Der Katalog wird beim Laden und dann alle 15 Minuten erneut geprüft.
 
 ### Ebenen
 

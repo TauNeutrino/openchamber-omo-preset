@@ -1,4 +1,4 @@
-import { connectHost, HostRequestError, type GuestProject, type GuestSessionRecord, type HostReadyContext, type SessionSnapshot } from '@openchamber/sdk';
+import { connectHost, HostRequestError, type GuestProject, type HostReadyContext } from '@openchamber/sdk';
 import {
   applyHostReady,
   mountBadge,
@@ -21,7 +21,7 @@ import {
   type PresetView,
   type WriteTarget,
 } from './config.ts';
-import { buildSessionTree, countGlyph, groupAgentSessions, sameDirectory, type AgentSession, type AgentSessionGroups, type SessionTreeNode } from './sessions.ts';
+import { countGlyph, groupAgentSessions, sameDirectory, type AgentSession, type AgentSessionGroups } from './sessions.ts';
 import { auditModelRefs, collectModelRefs, type ModelAudit } from './model-audit.ts';
 
 // The extension can see the global omo-slim config through the manifest's
@@ -80,12 +80,8 @@ let loadToken = 0;
 let heightFrame = 0;
 let mounted: Array<{ dispose: () => void }> = [];
 let agentSessions = new Map<string, AgentSessionGroups>();
-let currentSession: SessionSnapshot | null = null;
 /** Finished sessions hidden early (eye button); a new activity on a hidden session clears it. */
 const dismissedSessions = new Set<string>();
-let workspaceSessions: GuestSessionRecord[] = [];
-let treeOpen = false;
-const collapsedTreeNodes = new Set<string>();
 let openAgent: string | undefined;
 let sessionsToken = 0;
 let projectLookupToken = 0;
@@ -343,105 +339,6 @@ const openSession = (id: string): void => {
   });
 };
 
-const treeNode = (node: SessionTreeNode, isRoot: boolean, depth = 0): HTMLElement => {
-  const item = element('li', 'tree-item');
-  const row = element('div', 'tree-row');
-  if (node.children.length) {
-    const expanded = !collapsedTreeNodes.has(node.id);
-    const disclosure = element('button', 'tree-disclosure', expanded ? '▾' : '▸');
-    disclosure.type = 'button';
-    disclosure.dataset.treeToggle = node.id;
-    disclosure.setAttribute('aria-expanded', String(expanded));
-    disclosure.setAttribute('aria-label', `${node.title || node.id.slice(0, 8)}: ${node.children.length} direkte Subsessions ${expanded ? 'einklappen' : 'ausklappen'}`);
-    disclosure.addEventListener('click', () => {
-      if (expanded) collapsedTreeNodes.add(node.id);
-      else collapsedTreeNodes.delete(node.id);
-      paint();
-    });
-    row.append(disclosure);
-  } else {
-    const spacer = element('span', 'tree-disclosure-spacer');
-    spacer.setAttribute('aria-hidden', 'true');
-    row.append(spacer);
-  }
-
-  const button = element('button', 'tree-session');
-  button.type = 'button';
-  button.dataset.treeSession = node.id;
-  const title = node.title.trim() || node.id.slice(0, 8);
-  button.title = `${title}${node.record ? ` · ${relativeTime(node.record.updatedAt)}` : ''}`;
-  const headline = element('span', 'tree-headline');
-  headline.append(element('span', 'tree-title', title));
-  if (node.children.length) {
-    const count = element('span', 'tree-child-count', String(node.children.length));
-    count.setAttribute('aria-label', `${node.children.length} direkte Subsessions`);
-    headline.append(count);
-  }
-  button.append(headline);
-
-  const recordActivity = node.record?.activity ?? 'unknown';
-  const activity = isRoot && currentSession?.busy && (recordActivity === 'unknown' || recordActivity === 'idle')
-    ? 'running' : recordActivity;
-  const status = activity === 'running' ? 'Läuft'
-    : activity === 'retrying' ? 'Wiederholung'
-      : activity === 'waiting-permission' ? 'Warten auf Freigabe'
-        : activity === 'waiting-question' ? 'Warten auf Antwort' : '';
-  const outcome = node.record?.outcome === 'completed' ? '✓ Abgeschlossen'
-    : node.record?.outcome === 'failed' ? '× Fehlgeschlagen' : '';
-  const metadata = isRoot ? [currentSession?.agent, currentSession?.model].filter(Boolean).join(' · ') : '';
-  if (status || outcome || metadata) {
-    const details = element('span', 'tree-details');
-    if (status) {
-      const state = element('span', activity === 'running' ? 'tree-state is-live' : 'tree-state', status);
-      details.append(state);
-    }
-    if (outcome) details.append(element('span', 'tree-outcome', outcome));
-    if (metadata) details.append(element('span', 'tree-metadata', metadata));
-    button.append(details);
-  }
-  button.addEventListener('click', () => openSession(node.id));
-  row.append(button);
-  item.append(row);
-  if (node.children.length && !collapsedTreeNodes.has(node.id)) {
-    const children = element('ul', depth >= 5 ? 'tree-children is-deep' : 'tree-children');
-    for (const child of node.children) children.append(treeNode(child, false, depth + 1));
-    item.append(children);
-  }
-  return item;
-};
-
-const paintSessionTree = (panel: HTMLElement): void => {
-  const tree = buildSessionTree(currentSession, workspaceSessions);
-  if (!tree) return;
-  const section = element('section', 'tree-section');
-  const trigger = element('button', 'tree-section-trigger');
-  trigger.type = 'button';
-  trigger.dataset.treeSection = 'true';
-  trigger.setAttribute('aria-expanded', String(treeOpen));
-  trigger.setAttribute('aria-controls', 'omo-session-tree');
-  trigger.append(element('span', '', 'Aktuelle Session'), element('span', 'chevron', treeOpen ? '▴' : '▾'));
-  trigger.addEventListener('click', () => {
-    treeOpen = !treeOpen;
-    paint();
-  });
-  section.append(trigger);
-  const list = element('ul', 'tree-list');
-  list.id = 'omo-session-tree';
-  list.hidden = !treeOpen;
-  if (treeOpen) list.append(treeNode(tree, true));
-  section.append(list);
-  panel.append(section);
-};
-
-const layerRow = (label: string, value: string | null, path: string | undefined, muted: boolean): HTMLElement => {
-  const row = element('div', 'layer');
-  row.append(element('span', 'layer-label', label));
-  const text = element('strong', muted ? 'is-empty' : '', value ?? '–');
-  if (path) row.title = path;
-  row.append(text);
-  return row;
-};
-
 const paintPresetList = (parent: Element, model: ReadyModel, busy: boolean): void => {
   const names = sortedPresetNames(model.view.presets);
   const list = element('div', 'preset-list');
@@ -518,40 +415,6 @@ const paintMissingModelsBanner = (panel: HTMLElement, audit: ModelAudit): void =
   }));
 };
 
-const paintModelCheckRow = (panel: HTMLElement, check: ModelCheck, busy: boolean): void => {
-  const row = element('div', 'model-check');
-  const label = element('span', 'model-check-label');
-  const action = element('button', 'model-check-refresh', '↻');
-  action.type = 'button';
-  action.disabled = busy;
-  const audit: ModelAudit | null = check.kind === 'done' ? check.audit : null;
-  if (check.kind === 'checking') {
-    label.append(element('span', 'is-muted', 'Modelle werden geprüft …'));
-    action.disabled = true;
-  } else if (check.kind === 'unavailable') {
-    label.append(element('span', 'is-muted', 'Modellprüfung nicht verfügbar (Service nicht freigegeben).'));
-    action.remove();
-  } else if (check.kind === 'failed') {
-    label.append(element('span', 'is-muted', `Modellprüfung fehlgeschlagen: ${check.message}`));
-    action.title = 'Erneut prüfen';
-    action.addEventListener('click', () => refreshModelCheck(modelCheckRefs));
-  } else if (audit && audit.checkedAt === null) {
-    label.append(element('span', 'is-muted', audit.checked === 0 ? 'Keine Modelle konfiguriert.' : 'Noch nicht geprüft.'));
-    action.remove();
-  } else if (audit) {
-    const when = audit.checkedAt ? new Date(audit.checkedAt).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : '';
-    label.append(element('span', audit.ok ? 'is-ok' : 'is-missing', audit.ok
-      ? `✓ Alle ${audit.checked} konfigurierten Modelle verfügbar`
-      : `⚠ ${audit.missing.length} von ${audit.checked} Modellen fehlen im Katalog`));
-    label.title = `Geprüft ${when} · Kataloggröße ${audit.catalogSize}`;
-    action.title = 'Erneut prüfen';
-    action.addEventListener('click', () => refreshModelCheck(modelCheckRefs));
-  }
-  row.append(label);
-  if (action.isConnected) row.append(action);
-  panel.append(row);
-};
-
 const modelIsMissing = (audit: ModelAudit | null, model: string): boolean => (
   audit !== null && audit.checkedAt !== null && audit.missing.some((entry) => entry.ref === model)
 );
@@ -626,25 +489,6 @@ const paintReady = (panel: HTMLElement, model: ReadyModel): void => {
     for (const agent of model.view.agents) agents.append(agentRow(agent));
   }
   panel.append(agents);
-
-  const layers = element('div', 'layers');
-  layers.append(layerRow('Global', model.global.config.preset, model.global.path, !model.global.config.preset));
-  if (!model.directory) {
-    layers.append(layerRow('Projekt', null, undefined, true));
-    layers.lastElementChild?.setAttribute('title', 'Kein Projekt geöffnet');
-  } else {
-    layers.append(layerRow(
-      'Projekt',
-      model.project?.config.preset ?? null,
-      model.project?.path ?? PROJECT_PATHS[0],
-      !model.project?.config.preset,
-    ));
-  }
-  panel.append(layers);
-
-  paintSessionTree(panel);
-  paintModelCheckRow(panel, modelCheck, busy);
-  panel.append(element('p', 'hint', RESTART_HINT));
 };
 
 const paintLoading = (panel: HTMLElement): void => {
@@ -673,27 +517,16 @@ const paint = (): void => {
   const focused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   const focusedAgent = focused?.dataset.agent;
   const focusedSession = focused?.dataset.session;
-  const focusedTreeSession = focused?.dataset.treeSession;
-  const focusedTreeToggle = focused?.dataset.treeToggle;
-  const focusedTreeSection = focused?.dataset.treeSection === 'true';
-  const treeScroll = root.querySelector<HTMLElement>('.tree-list')?.scrollTop ?? 0;
   clearMounted();
   const panel = element('div', 'panel');
   if (screen.kind === 'loading') {
     paintLoading(panel);
-    paintSessionTree(panel);
   } else if (screen.kind === 'failed') {
     paintFailed(panel, screen);
-    paintSessionTree(panel);
   } else paintReady(panel, screen.model);
   root.append(panel);
-  const treeList = root.querySelector<HTMLElement>('.tree-list');
-  if (treeList) treeList.scrollTop = treeScroll;
   if (focusedAgent) [...root.querySelectorAll<HTMLElement>('.agent-disclosure')].find((item) => item.dataset.agent === focusedAgent)?.focus();
   else if (focusedSession) [...root.querySelectorAll<HTMLElement>('.session-option')].find((item) => item.dataset.session === focusedSession)?.focus();
-  else if (focusedTreeSection) root.querySelector<HTMLElement>('.tree-section-trigger')?.focus();
-  else if (focusedTreeToggle) [...root.querySelectorAll<HTMLElement>('.tree-disclosure')].find((item) => item.dataset.treeToggle === focusedTreeToggle)?.focus();
-  else if (focusedTreeSession) [...root.querySelectorAll<HTMLElement>('.tree-session')].find((item) => item.dataset.treeSession === focusedTreeSession)?.focus();
   scheduleHeight();
 };
 
@@ -707,8 +540,6 @@ const watchSessions = (currentDirectory: string | null): void => {
   ++subscriptionToken;
   subscribedProject = null;
   agentSessions = new Map();
-  workspaceSessions = [];
-  collapsedTreeNodes.clear();
   openAgent = undefined;
   if (!currentDirectory) return;
 
@@ -729,7 +560,6 @@ const watchSessions = (currentDirectory: string | null): void => {
     const subscription = ++subscriptionToken;
     subscribedProject = projectId;
     agentSessions = new Map();
-    workspaceSessions = [];
     openAgent = undefined;
     paint();
     if (!projectId) return;
@@ -744,12 +574,10 @@ const watchSessions = (currentDirectory: string | null): void => {
           entries.active.map((entry) => [entry.id, entry.title, entry.activity]),
           entries.recent.map((entry) => [entry.id, entry.title, entry.activity, entry.updatedAt]),
         ]));
-        const treeSignature = (sessions: GuestSessionRecord[]): string => JSON.stringify(sessions.map((session) => [session.id, session.title, session.parentId, session.archivedAt, session.activity, session.outcome, session.updatedAt]));
-        const unchanged = signature(next) === signature(agentSessions) && treeSignature(records) === treeSignature(workspaceSessions);
+        const unchanged = signature(next) === signature(agentSessions);
         agentSessions = next;
         // Aktivität setzt eine vorzeitige Ausblendung zurück.
         for (const entry of next.values()) for (const active of entry.active) dismissedSessions.delete(active.id);
-        workspaceSessions = records;
         if (unchanged) return;
         if (openAgent !== undefined && !next.has(openAgent)) openAgent = undefined;
         // A live update must not reset focus in the preset picker or confirmation.
@@ -1030,11 +858,4 @@ host.onDirectory((next) => {
   directory = next;
   watchSessions(directory);
   void loadAndPaint();
-});
-
-host.onSession((next) => {
-  if (JSON.stringify(next) === JSON.stringify(currentSession)) return;
-  if (next?.id !== currentSession?.id) collapsedTreeNodes.clear();
-  currentSession = next;
-  if (didMount && !listOpen && interaction.kind === 'browse') paint();
 });
