@@ -12,6 +12,8 @@ import {
   type ParsedLayer,
   type PresetLayerKind,
 } from '../src/config.ts';
+import { setLocale } from '../src/i18n.ts';
+setLocale('de');
 
 const GLOBAL = '~/.config/opencode/oh-my-opencode-slim.json';
 const PROJECT = '.opencode/oh-my-opencode-slim.json';

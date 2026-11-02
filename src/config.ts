@@ -132,10 +132,10 @@ export const parseConfigText = (raw: string, label: string): ParseOutcome => {
     const where = first && Number.isFinite(first.offset)
       ? ` (${printParseErrorCode(first.error)} at offset ${first.offset})`
       : '';
-    return { ok: false, error: `${label} enthält ungültiges JSONC${where}.` };
+    return { ok: false, error: `${label} ${t('containsInvalidJsonc')}${where}.` };
   }
   if (!isPlainObject(parsed)) {
-    return { ok: false, error: `${label} muss ein JSON-Objekt als Wurzel enthalten.` };
+    return { ok: false, error: `${label} ${t('mustBeJsonObject')}` };
   }
 
   let preset: string | null = null;
