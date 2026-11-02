@@ -1,96 +1,84 @@
-# Omo Slim Preset Selector
+# oMo Slim Preset Selector
 
-Eine OpenChamber-Extension, die das aktive Preset von **oh-my-opencode-slim** anzeigt und wechselt — ohne TUI und ohne die Config von Hand zu bearbeiten.
+[![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![version](https://img.shields.io/badge/version-1.1.10-blue)](package.json)
+
+An OpenChamber extension that shows the active **oh-my-opencode-slim** preset and switches it — without the TUI and without editing the config by hand.
 
 ![Screenshot](assets/screenshot.png)
 
-- Panel auf der rechten Leiste und Sektion im Work-Status-Panel.
-- Zeigt aktives Preset, Herkunft (`Global` / `Projekt`) und die Agent→Modell-Zuordnung des aktiven Presets.
-- Dropdown aller Presets mit dem Orchestrator-Modell als Entscheidungshilfe.
-- Bestätigungsdialog vor jedem Wechsel; Abbruch schreibt nichts.
-- Schreibt ausschließlich den Schlüssel `preset`. Kommentare, Reihenfolge und Formatierung der JSONC-Datei bleiben erhalten.
+- Panel on the right rail and a section in the Work Status panel.
+- Shows the active preset, its origin (`Global` / `Project`), and the agent→model mapping of the active preset.
+- Dropdown of every preset, with the orchestrator model as a decision hint.
+- Confirmation dialog before every switch; cancelling writes nothing.
+- Writes **only** the `preset` key. Comments, ordering and formatting of the JSONC file stay intact.
+- Checks configured models against the effective model catalog and marks missing ones in red.
+- Tracks active and recently finished sessions per agent, with live runtime display.
+- Effective after a Managed Service restart (Settings → Apply & Restart).
 
-## Installation
+## Install
 
-1. OpenChamber → Settings → Extensions → Ordner installieren.
-2. Diesen Ordner auswählen (der Ordner mit `package.json`).
-3. Die angefragten Berechtigungen bestätigen: `filesystem` für die globale Config, `files` für den Projekt-Override.
+1. OpenChamber → Settings → Extensions → Add extension.
+2. Enter this repository's URL: `https://github.com/TauNeutrino/openchamber-omo-slim-preset-selector.git`
+3. Confirm the requested permissions:
+   - `filesystem` for the global config
+   - `files` for the project override
+   - `sessions` for the per-agent session tracking
+   - `service` (`exec: opencode`) for the model catalog check
+4. Open the **oMo Slim Preset Selector** panel on the right rail.
 
-Es gibt keine Remote-Installation und keinen eigenen Service. Das Manifest deklariert `apiVersion: 1`, einen Panel-Beitrag und dieselbe Seite als Work-Status-Sektion.
+Web and desktop clients are supported. The phone app and VS Code do not load extensions.
+
+## Where the config comes from
+
+| Layer | Path |
+| --- | --- |
+| Global | `~/.config/opencode/oh-my-opencode-slim.json`, else `.jsonc` |
+| Project override | `.opencode/oh-my-opencode-slim.json`, else `.jsonc` |
+
+The project map is merged over the global one; the active preset's origin badge shows which layer it comes from.
+
+## Model check
+
+After every load (and then every 15 minutes) the panel checks whether the configured models still exist in the effective catalog. The catalog comes from a small host-managed service that asks `opencode models` (60 s cache, no background load). Missing models are marked red on the agent row and summarized as a warning banner. Unavailable models never crash the switch — the user decides.
+
+## Sessions per agent
+
+Active sessions show a blue circled count badge; sessions that finished within the last 8 hours show a green squared count badge with a live runtime. Each agent row can be expanded to list its sessions (active first, then finished with outcome and relative time). A finished session can be hidden early with the 👁 button; the hide is reset automatically when the session becomes active again.
+
+## Build
+
+```bash
+npm install
+npm run build   # writes panel/main.js and service/main.js
+npm run check   # build + iife + manifest + tests
+npm test
+npm run type-check
+```
+
+The built files are committed: OpenChamber installs extensions without building them. Bump `version` in `package.json` to ship an update through Git.
+
+## Permissions
+
+| Permission | Why |
+| --- | --- |
+| `files` | Read/write the project override |
+| `filesystem` | Read/write the global config |
+| `sessions` | Track sub-sessions per agent |
+| `service` (`exec: opencode`) | Run `opencode models` for the catalog check |
+
+The extension only ever writes the `preset` key. The presets map, comments, ordering and formatting of the JSONC file are preserved.
+
+## License
+
+MIT
 
 ## Support
 
-Wenn dir die Extension gefällt, kannst du die Entwicklung unterstützen:
+If you find this extension useful, you can support the development:
 
 [![Donate with PayPal](https://www.paypalobjects.com/en_US/i/btn/btn_donate_SM.gif)](https://www.paypal.com/donate/?hosted_button_id=R5G9H9TFGQNUY)
 
 [![ko-fi](https://storage.ko-fi.com/cdn/kofi5.png?v=6)](https://ko-fi.com/O4O01ZCNJE)
-
-### Modellprüfung
-Das Panel prüft nach jedem Laden (und dann alle 15 Minuten), ob die konfigurierten Modelle im effektiven Modellkatalog existieren. Der Katalog kommt von einem Local-Service der Extension (host-gemanagt, startet beim ersten `serviceRequest`), der `opencode models` befragt — keine Hintergrundlast außer bei Bedarf, 60-Sekunden-Cache. Fehlende Modelle werden an der Agenten-Zeile rot markiert und oben als Warnung zusammengefasst. Der Katalog wird beim Laden und dann alle 15 Minuten erneut geprüft.
-
-### Ebenen
-
-Gelesen werden, in dieser Reihenfolge:
-
-| Ebene | Pfad |
-| --- | --- |
-| Global | `~/.config/opencode/oh-my-opencode-slim.json`, sonst `.jsonc` |
-| Projekt | `.opencode/oh-my-opencode-slim.json`, sonst `.jsonc` (relativ zum geöffneten Projekt) |
-
-Ein Projekt-Override gewinnt, sobald er `preset` setzt. Ein Wechsel schreibt in **die Ebene, aus der das aktive Preset stammt** — ein Override bleibt also ein Override, genau wie in der Referenz-Implementierung und in der OpenChamber-API. Das Panel legt keinen Projekt-Override an; es ändert nur eine vorhandene Auswahl.
-
-Definiert der Projekt-Override eine eigene `presets`-Map, entscheidet diese Map, welche Namen dort geschrieben werden dürfen; sonst erbt er die globale Map. Ein Name, der in der Zielebene nicht definiert ist, wird ohne Schreibvorgang abgelehnt.
-
-### Anwenden
-
-Nach der Bestätigung liest die Extension die Zieldatei **erneut**, prüft Preset-Name und Zielebene gegen den frischen Inhalt und schreibt erst dann. Nur `preset` wird per `jsonc-parser` `modify`/`applyEdits` ersetzt; danach wird das Ergebnis erneut geparst und gegen die ursprüngliche `presets`-Map verglichen. Schlägt eine Prüfung fehl, wird nichts geschrieben.
-
-Die Extension startet den Managed Service **nicht** neu. Der Hinweis im Panel sagt es klar:
-
-> Wirksam nach Neustart des Managed Service (Settings → Apply & Restart).
-
-Ohne Neustart läuft der bestehende Service weiter mit dem alten Preset; neue Sessions nach dem Neustart verwenden das neue.
-
-### Fehlerzustände
-
-- Config fehlt: Hinweis mit beiden erwarteten Pfaden, kein Schreibvorgang.
-- Config nicht parsebar: Fehlermeldung mit Fehlercode und Offset, kein Schreibvorgang.
-- Aktives Preset nicht in der zuständigen `presets`-Map: Fehlermeldung, kein Schreibvorgang.
-- Projekt-Override nicht lesbar (z. B. Berechtigung entzogen): Fehlermeldung statt stiller Annahme, keine Schreibvorgänge.
-
-## Entwicklung
-
-```bash
-npm install
-npm run build        # src/panel.ts -> panel/main.js (klassisches IIFE)
-npm test             # JSONC-/Ebenen-Unit-Tests (node:test)
-npm run type-check   # tsc --noEmit
-npm run check        # build + IIFE-Check + Manifest-Check + Tests
-```
-
-`panel/main.js` wird mitgebaut und liegt im Repo, weil der Host keine TypeScript-Dateien kompiliert und kein ESM im iframe lädt. Der Build nutzt esbuild als devDependency; Laufzeit-Abhängigkeiten sind nur `@openchamber/sdk` (wird in das Bundle gezogen) und `jsonc-parser`.
-
-`npm run check:iife` prüft mit `node --check`, dass das Artefakt ein klassisches Script ohne `import`/`export` ist. `npm run check:manifest` validiert `package.json` mit dem echten SDK-Parser (`parseManifestJson`), prüft `apiVersion`, die Einträge und die filesystem-Globs.
-
-### Warum keine relativen filesystem-Globs?
-
-`contributes.filesystem` akzeptiert laut SDK nur Muster, die mit `/` oder `~/` beginnen (`isGuestFilesystemPattern`); ein relativer Eintrag wie `.opencode/oh-my-opencode-slim.json` wäre `invalid-filesystem` und würde die Installation ablehnen. Der Projekt-Override läuft deshalb über die relative Pfadform der Datei-API und die Capability `files`, die das SDK ausdrücklich für Pfade innerhalb des geöffneten Projekts vorsieht. Das Panel fragt `ready.directory` ab und zeigt ohne Projekt nur die globale Ebene.
-
-## Bewusst nicht im Scope
-
-- Presets anlegen, bearbeiten oder löschen (bleibt Aufgabe von oms / der Config).
-- Managed-Service-Restart aus der Extension.
-- Einen Projekt-Override erzeugen, wenn keiner existiert.
-
-## Validierung
-
-Automatisiert:
-
-- 22 Unit-Tests für Lesen/Schreiben: `.json` und `.jsonc`, Kommentare, Reihenfolge, CRLF, BOM, Einrückung, Einfügen eines fehlenden `preset`, Ablehnung von Parse-Fehlern und unbekannten Presets, Ebenen-Auflösung.
-- Build-Artefakt: klassisches IIFE ohne `import`/`export`, per `node --check` geprüft.
-- Manifest: mit `parseManifestJson` aus `@openchamber/sdk/schemas` validiert.
-
-Manuell gegen einen Mock-Host im Browser geprüft (nicht Teil des Repos): Anzeige mit globalem und Projekt-Override, Dropdown, Bestätigen/Abbrechen, Fehlerzustände, Schreiben in `.jsonc` mit erhaltenem Kommentar, erneutes Lesen vor dem Schreiben, `setHeight` im Status-Surface.
-
-Nicht geprüft: echter Installations- und Ladetest in OpenChamber, Verhalten des Managed-Service-Restarts, Light-Theme im Host, mobile/VSCode-Surfaces.
+EOF
+echo written
