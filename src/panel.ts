@@ -411,7 +411,12 @@ const paintPresetList = (parent: Element, model: ReadyModel, busy: boolean): voi
     const hint = orchestratorModel(model.view.presets, name);
     if (hint) label.append(element('span', 'option-model', hint));
     option.append(label);
-    if (active) option.append(element('span', 'option-check', '✓'));
+  if (active) {
+    const badge = element('span', 'origin-badge', model.view.active.origin === 'project' ? t('projectLayer') : t('globalLayer'));
+    if (model.view.active.origin === 'project') badge.classList.add('is-project');
+    option.append(badge);
+    option.append(element('span', 'option-check', '✓'));
+  }
     option.addEventListener('click', () => {
       listOpen = false;
       if (name === model.view.active.name) {
@@ -440,10 +445,10 @@ const paintTrigger = (parent: Element, model: ReadyModel, busy: boolean): void =
   trigger.disabled = busy;
   trigger.title = t('switchPreset');
   trigger.append(element('span', 'preset-name', model.view.active.name));
-  mounted.push(mountBadge(trigger, {
-    label: model.view.active.origin === 'project' ? t('projectLayer') : t('globalLayer'),
-    tone: model.view.active.origin === 'project' ? 'info' : 'neutral',
-  }));
+  const originBadge = element('span', 'origin-badge', model.view.active.origin === 'project' ? t('projectLayer') : t('globalLayer'));
+  originBadge.style.pointerEvents = 'none';
+  if (model.view.active.origin === 'project') originBadge.classList.add('is-project');
+  trigger.append(originBadge);
   trigger.append(element('span', 'chevron', listOpen ? '▴' : '▾'));
   trigger.addEventListener('click', () => {
     listOpen = !listOpen;
