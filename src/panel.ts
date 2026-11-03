@@ -412,12 +412,12 @@ const paintPresetList = (parent: Element, model: ReadyModel, busy: boolean): voi
     const hint = orchestratorModel(model.view.presets, name);
     if (hint) label.append(element('span', 'option-model', hint));
     option.append(label);
-  if (active) {
-    const badge = element('span', 'origin-badge', model.view.active.origin === 'project' ? t('projectLayer') : t('globalLayer'));
-    if (model.view.active.origin === 'project') badge.classList.add('is-project');
+    const inProject = !!model.project?.config.hasPresets && (model.project.config.presetNames?.includes(name) ?? false);
+    const origin = inProject ? 'project' : 'global';
+    const badge = element('span', 'origin-badge', origin === 'project' ? t('projectLayer') : t('globalLayer'));
+    if (origin === 'project') badge.classList.add('is-project');
     option.append(badge);
-    option.append(element('span', 'option-check', '✓'));
-  }
+    if (active) option.append(element('span', 'option-check', '✓'));
     option.addEventListener('click', () => {
       listOpen = false;
       if (name === model.view.active.name) {
