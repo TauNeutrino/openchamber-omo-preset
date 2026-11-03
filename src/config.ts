@@ -332,3 +332,42 @@ export const orchestratorModel = (
 export const sortedPresetNames = (presets: Record<string, PresetAgent[]>): string[] => (
   Object.keys(presets).sort((left, right) => left.localeCompare(right))
 );
+
+export const applyAgentModelToText = (
+  raw: string, presetName: string, agentName: string, model: string, variant?: string | null,
+): string => {
+  const nextModel = model.trim();
+  if (!nextModel) throw new Error(t('presetNameEmpty'));
+  const before = parseConfigText(raw, t('configLabel'));
+  if (!before.ok) throw new Error(before.error);
+  if (before.config.commentOnly) throw new Error(t('changeNotVerified'));
+
+  const hasBom = raw.startsWith(BOM);
+  const content = hasBom ? raw.slice(1) : raw;
+  const parsed = parseJsonc(content, [], { allowTrailingComma: true });
+  if (!isPlainObject(parsed)) throw new Error(t('mustBeJsonObject'));
+  const presets = isPlainObject(parsed.presets) ? parsed.presets : null;
+  if (!presets || !isPlainObject(presets[presetName])) throw new Error(t('presetNotDefined', presetName, t('configLabel')));
+  const block = presets[presetName] as Record<string, unknown>;
+  const wrapped = isPlainObject(block.agents);
+  const basePath = wrapped
+    ? ['presets', presetName, 'agents', agentName]
+    : ['presets', presetName, agentName];
+
+  const fmt = formattingFor(content);
+  let edits = modify(content, [...basePath, 'model'], nextModel, { formattingOptions: fmt });
+  const v = variant?.trim() ?? '';
+  if (v) {
+    edits = edits.concat(modify(content, [...basePath, 'variant'], v, { formattingOptions: fmt }));
+  } else {
+    edits = edits.concat(modify(content, [...basePath, 'variant'], undefined, { formattingOptions: fmt }));
+  }
+
+  const next = applyEdits(content, edits);
+  const after = parseConfigText(next, t('resultLabel'));
+  if (!after.ok) throw new Error(`Die Änderung würde die Konfiguration beschädigen: ${after.error}`);
+  const agents = after.config.presets[presetName] ?? [];
+  const changed = agents.find((a) => a.agent === agentName);
+  if (!changed || changed.model !== nextModel) throw new Error(t('changeNotVerified'));
+  return hasBom ? `${BOM}${next}` : next;
+};

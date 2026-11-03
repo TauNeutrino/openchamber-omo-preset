@@ -103,6 +103,7 @@ const de: Dictionary = {
   orchestratorModelHint: (m: string) => m,
   settings: 'Einstellungen',
   finishedSessionsWindow: 'Beendete Sessions anzeigen (Stunden)',
+  presetEditingEnabled: 'Preset-Bearbeitung erlauben (Modelle ändern)',
 };
 
 const en: Dictionary = {
@@ -189,6 +190,7 @@ const en: Dictionary = {
   orchestratorModelHint: (m: string) => m,
   settings: 'Settings',
   finishedSessionsWindow: 'Show finished sessions (hours)',
+  presetEditingEnabled: 'Allow preset editing (change models)',
 };
 
 const dictionaries: Record<Locale, Dictionary> = { de, en };

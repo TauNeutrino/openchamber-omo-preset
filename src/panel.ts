@@ -9,6 +9,7 @@ import {
 } from '@openchamber/sdk/ui';
 
 import {
+  applyAgentModelToText,
   applyPresetToText,
   orchestratorModel,
   parseConfigText,
@@ -106,8 +107,15 @@ let agentSessions = new Map<string, AgentSessionGroups>();
 const dismissedSessions = new Set<string>();
 /** Hours a finished session stays visible. Configurable in the panel's settings section. */
 let finishedWindowHours = 8;
+let presetEditingEnabled = false;
 /** Last session snapshot as delivered by the host, for regrouping when the window changes. */
 let lastSessionSnapshot: { records: AgentSession[]; projectId: string; directory: string } | null = null;
+/** Model picker state when preset editing is enabled. */
+let modelPicker: { agent: string; presetName: string; targetPath: string; currentModel: string; currentVariant: string } | null = null;
+let pickerFilter = '';
+let pickerAppliedFilter = '';
+let pickerDebounce: ReturnType<typeof setTimeout> | 0 = 0;
+let modelCatalog: string[] = [];
 
 const regroupSessions = (): void => {
   if (!lastSessionSnapshot) return;
@@ -237,7 +245,7 @@ const paintBanner = (parent: Element, value: Notice): void => {
 
 const auditForReadyScreen = (): ModelAudit | null => (modelCheck.kind === 'done' ? modelCheck.audit : null);
 
-const agentRow = (agent: PresetAgent): HTMLElement => {
+const agentRow = (agent: PresetAgent, editable: boolean, onEdit: (agent: PresetAgent) => void): HTMLElement => {
   const key = agent.agent;
   const name = agent.agent;
   const missing = modelIsMissing(auditForReadyScreen(), agent.model);
@@ -267,7 +275,11 @@ const agentRow = (agent: PresetAgent): HTMLElement => {
   } else {
     row.append(element('span', 'agent-name', name));
   }
-  const value = element('span', 'agent-model');
+  const value = element('span', editable ? 'agent-model is-editable' : 'agent-model');
+  if (editable) {
+    value.style.cursor = 'pointer';
+    value.addEventListener('click', () => onEdit(agent));
+  }
   const model = element('span', 'model-text');
   // Provider part dezent, Modell-ID betont — Split am letzten "/".
   const slash = agent.model.lastIndexOf('/');
@@ -585,6 +597,20 @@ const paintReady = (panel: HTMLElement, model: ReadyModel): void => {
     });
     row.append(input);
     box.append(row);
+
+    const editRow = element('div', 'setting-row');
+    editRow.append(element('span', 'setting-label', t('presetEditingEnabled')));
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.className = 'setting-input';
+    checkbox.checked = presetEditingEnabled;
+    checkbox.addEventListener('change', () => {
+      presetEditingEnabled = checkbox.checked;
+      void host.storage.set('presetEditingEnabled', checkbox.checked).catch(() => undefined);
+      paint();
+    });
+    editRow.append(checkbox);
+    box.append(editRow);
     panel.append(box);
   }
 
@@ -596,9 +622,40 @@ const paintReady = (panel: HTMLElement, model: ReadyModel): void => {
   if (model.view.agents.length === 0) {
     agents.append(element('div', 'agents-empty', t('noAgentsConfigured')));
   } else {
-    for (const agent of model.view.agents) agents.append(agentRow(agent));
+    for (const agent of model.view.agents) agents.append(agentRow(agent, presetEditingEnabled, (a) => openModelPicker(a, model)));
   }
   panel.append(agents);
+
+  if (modelPicker) {
+    const box = element('div', 'model-picker');
+    const head = element('div', 'picker-head');
+    head.append(element('span', 'picker-title', `${modelPicker.agent} · ${modelPicker.presetName}`));
+    const close = element('button', 'icon-btn', '×');
+    close.type = 'button';
+    close.title = t('cancel');
+    close.addEventListener('click', () => { closeModelPicker(); paint(); });
+    head.append(close);
+    box.append(head);
+    if (pickerFilter) {
+      box.append(element('div', 'picker-filter', `Filter: ${pickerFilter}`));
+    }
+    const list = element('div', 'picker-list');
+    const filter = pickerAppliedFilter.toLowerCase();
+    const items = modelCatalog.filter((m) => !filter || m.toLowerCase().includes(filter));
+    if (items.length === 0) {
+      list.append(element('div', 'picker-empty', modelCatalog.length === 0 ? t('modelCheckUnavailable') : t('noModelsConfigured')));
+    } else {
+      for (const m of items) {
+        const opt = element('button', 'picker-option', m);
+        opt.type = 'button';
+        if (m === modelPicker.currentModel) opt.classList.add('is-current');
+        opt.addEventListener('click', () => { void applyPickedModel(m); });
+        list.append(opt);
+      }
+    }
+    box.append(list);
+    panel.append(box);
+  }
 };
 
 const paintLoading = (panel: HTMLElement): void => {
@@ -777,6 +834,65 @@ const refreshModelCheck = (refs: readonly string[], options: { background?: bool
     });
 };
 
+const fetchModelCatalog = async (): Promise<void> => {
+  try {
+    const result = await host.serviceRequest({ method: 'GET', path: '/models' });
+    if (result.status !== 200) return;
+    const answer = JSON.parse(result.body) as { ok?: boolean; catalog?: unknown };
+    if (answer.ok && Array.isArray(answer.catalog)) {
+      modelCatalog = answer.catalog as string[];
+      paint();
+    }
+  } catch {
+    // ignore; picker will show "unavailable"
+  }
+};
+
+const openModelPicker = (agent: PresetAgent, model: ReadyModel): void => {
+  const project = model.project;
+  const global = model.global;
+  let targetPath = global.path;
+  if (project?.config.hasPresets && project.config.presetNames.includes(model.view.active.name)) {
+    targetPath = project.path;
+  }
+  modelPicker = {
+    agent: agent.agent,
+    presetName: model.view.active.name,
+    targetPath,
+    currentModel: agent.model,
+    currentVariant: agent.variant ?? '',
+  };
+  pickerFilter = '';
+  pickerAppliedFilter = '';
+  if (pickerDebounce) { clearTimeout(pickerDebounce); pickerDebounce = 0; }
+  if (modelCatalog.length === 0) void fetchModelCatalog();
+  paint();
+};
+
+const closeModelPicker = (): void => {
+  modelPicker = null;
+  pickerFilter = '';
+  pickerAppliedFilter = '';
+  if (pickerDebounce) { clearTimeout(pickerDebounce); pickerDebounce = 0; }
+};
+
+const applyPickedModel = async (picked: string): Promise<void> => {
+  if (!modelPicker) return;
+  const { agent, presetName, targetPath, currentVariant } = modelPicker;
+  try {
+    const file = await readConfigFile(targetPath);
+    if (file.kind === 'missing') throw new Error(t('fileNotFound', targetPath));
+    if (file.kind === 'failed') throw new Error(file.message);
+    const next = applyAgentModelToText(file.raw, presetName, agent, picked, currentVariant);
+    await host.writeFile(targetPath, next);
+    closeModelPicker();
+    await loadAndPaint();
+  } catch (error) {
+    notice = { tone: 'error', title: t('presetNotChanged'), body: errorText(error) };
+    paint();
+    autoDismissNotice(5000);
+  }
+};
 const auditRefsFor = (view: PresetView, project: ParsedLayer | null): string[] => collectModelRefs(
   view.agents,
   [
@@ -971,6 +1087,36 @@ document.addEventListener('keydown', (event) => {
 
 // A click listener, not pointerdown: closing must not remove the element the
 // user just pressed before its own click handler runs.
+document.addEventListener('keydown', (event) => {
+  if (!modelPicker) return;
+  const target = event.target;
+  if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) return;
+  if (event.key === 'Escape') {
+    closeModelPicker();
+    paint();
+    event.preventDefault();
+    return;
+  }
+  if (event.key === 'Backspace') {
+    pickerFilter = pickerFilter.slice(0, -1);
+    if (pickerDebounce) { clearTimeout(pickerDebounce); pickerDebounce = 0; }
+    pickerDebounce = setTimeout(() => { pickerAppliedFilter = pickerFilter; paint(); }, 500);
+    paint();
+    event.preventDefault();
+    return;
+  }
+  // Accept printable characters only.
+  if (event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
+    pickerFilter += event.key;
+    if (pickerDebounce) { clearTimeout(pickerDebounce); pickerDebounce = 0; }
+    pickerDebounce = setTimeout(() => { pickerAppliedFilter = pickerFilter; paint(); }, 500);
+    paint();
+    event.preventDefault();
+  }
+});
+
+// A click listener, not pointerdown: closing must not remove the element the
+// user just pressed before its own click handler runs.
 document.addEventListener('click', (event) => {
   const target = event.target;
   if (!(target instanceof Element)) return;
@@ -1011,6 +1157,8 @@ host.onReady(async (ctx) => {
   const fromSettings = parseWindowHours(ctx.settings?.finishedWindowHours);
   const fromStorage = await host.storage.get('finishedWindowHours').catch(() => undefined);
   const resolved = fromSettings ?? parseWindowHours(fromStorage) ?? 8;
+  const editStored = await host.storage.get('presetEditingEnabled').catch(() => undefined);
+  if (typeof editStored === 'boolean') presetEditingEnabled = editStored;
   if (!didMount) {
     finishedWindowHours = resolved;
   } else {
