@@ -635,35 +635,40 @@ const paintReady = (panel: HTMLElement, model: ReadyModel): void => {
   }
 
   if (cloneState) {
-    const box = element('div', 'settings-box');
+    const box = element('div', 'confirm clone-box');
     box.append(element('div', 'confirm-title', t('clonePreset')));
-    box.append(element('div', 'confirm-body', `${cloneState.source}`));
+    const body = element('div', 'confirm-body');
+    body.append(document.createTextNode(t('cloneSource', cloneState.source)));
+    box.append(body);
+
     if (cloneState.scope === null) {
-      const row = element('div', 'setting-row');
-      const gBtn = element('button', 'icon-btn', t('cloneGlobal'));
+      const scope = element('div', 'clone-scope');
+      const gBtn = element('button', 'clone-scope-btn', t('cloneGlobal'));
       gBtn.type = 'button';
       gBtn.addEventListener('click', () => { if (cloneState) { cloneState.scope = 'global'; paint(); } });
-      const pBtn = element('button', 'icon-btn', t('cloneProject'));
+      const pBtn = element('button', 'clone-scope-btn', t('cloneProject'));
       pBtn.type = 'button';
       pBtn.addEventListener('click', () => { if (cloneState) { cloneState.scope = 'project'; paint(); } });
-      row.append(gBtn, pBtn);
-      box.append(row);
+      scope.append(gBtn, pBtn);
+      box.append(scope);
     } else {
-      const row = element('div', 'setting-row');
-      row.append(element('span', 'setting-label', t('cloneName')));
+      const field = element('div', 'clone-field');
+      const label = element('label', 'clone-label', t('cloneName'));
       const input = document.createElement('input');
       input.type = 'text';
-      input.className = 'setting-input';
-      input.style.width = '140px';
+      input.className = 'clone-input';
       input.value = cloneState.name;
+      input.placeholder = cloneState.source;
       input.addEventListener('input', () => { if (cloneState) cloneState.name = input.value; });
-      row.append(input);
-      box.append(row);
+      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); void doClone(model); } });
+      field.append(label, input);
+      box.append(field);
+
       const actions = element('div', 'confirm-actions');
-      const cancel = element('button', 'icon-btn', t('cancel'));
+      const cancel = element('button', 'confirm-cancel', t('cancel'));
       cancel.type = 'button';
       cancel.addEventListener('click', () => { cloneState = null; paint(); });
-      const create = element('button', 'icon-btn', t('cloneCreate'));
+      const create = element('button', 'confirm-apply', t('cloneCreate'));
       create.type = 'button';
       create.addEventListener('click', () => { void doClone(model); });
       actions.append(cancel, create);

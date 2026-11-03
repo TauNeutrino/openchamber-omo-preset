@@ -422,6 +422,50 @@
       }
       .confirm-hint { font-size: 11px; line-height: 1.45; color: var(--oc-info-text, var(--oc-muted, #999)); }
       .confirm-actions { display: flex; justify-content: flex-end; gap: 6px; }
+      .clone-box { gap: 10px; }
+      .clone-scope { display: flex; gap: 6px; }
+      .clone-scope-btn {
+        flex: 1 1 0;
+        padding: 6px 8px;
+        border: 1px solid var(--oc-border, rgba(127, 127, 127, 0.28));
+        border-radius: calc(var(--oc-radius, 8px) * 0.7);
+        background: transparent;
+        color: var(--oc-fg, #ddd);
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 500;
+      }
+      .clone-scope-btn:hover { background: var(--oc-hover, rgba(127, 127, 127, 0.15)); }
+      .clone-field { display: flex; flex-direction: column; gap: 4px; }
+      .clone-label { font-size: 11px; color: var(--oc-muted, #999); }
+      .clone-input {
+        padding: 6px 8px;
+        border: 1px solid var(--oc-border, rgba(127, 127, 127, 0.28));
+        border-radius: calc(var(--oc-radius, 8px) * 0.7);
+        background: transparent;
+        color: var(--oc-fg, #ddd);
+        font-size: 12px;
+      }
+      .confirm-cancel {
+        padding: 6px 10px;
+        border: 1px solid var(--oc-border, rgba(127, 127, 127, 0.28));
+        border-radius: calc(var(--oc-radius, 8px) * 0.7);
+        background: transparent;
+        color: var(--oc-muted, #999);
+        cursor: pointer;
+        font-size: 12px;
+      }
+      .confirm-apply {
+        padding: 6px 12px;
+        border: 0;
+        border-radius: calc(var(--oc-radius, 8px) * 0.7);
+        background: var(--oc-primary, #4a9eff);
+        color: var(--oc-primary-foreground, #fff);
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .confirm-apply:hover { filter: brightness(1.1); }
 
       .loading { padding: 8px 2px; }
 
@@ -432,6 +476,6 @@
   </head>
   <body>
     <div id="root"></div>
-    <script src="main.js?v=1.5.1"></script>
+    <script src="main.js?v=1.5.2"></script>
   </body>
 </html>
