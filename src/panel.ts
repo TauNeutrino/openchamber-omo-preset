@@ -762,6 +762,21 @@ const paintReady = (panel: HTMLElement, model: ReadyModel): void => {
             vwrap.append(pill);
           }
           row.append(vwrap);
+        } else {
+          const vinput = document.createElement('input');
+          vinput.type = 'text';
+          vinput.className = 'variant-input';
+          vinput.placeholder = 'variant';
+          vinput.title = t('cloneName');
+          vinput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              e.stopPropagation();
+              const v = vinput.value.trim();
+              void applyPickedModel(m, v);
+            }
+          });
+          row.append(vinput);
         }
         list.append(row);
       }
