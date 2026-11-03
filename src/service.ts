@@ -26,7 +26,7 @@ const CLI_CANDIDATES = (): string[] => ([
   path.join(homedir(), '.opencode', 'bin', 'opencode'),
 ]);
 
-type Cache = { catalog: string[]; checkedAt: string; error?: undefined } | null;
+type Cache = { catalog: string[]; checkedAt: string; variants: Record<string, string[]>; error?: undefined } | null;
 let cache: Cache = null;
 let inflight: Promise<Exclude<Cache, null>> | null = null;
 
@@ -35,13 +35,40 @@ const runOnce = (cmd: string): Promise<string> => new Promise((resolve, reject) 
     (error, stdout) => (error ? reject(error) : resolve(stdout)));
 });
 
+const fetchVariants = async (cmd: string): Promise<Record<string, string[]>> => {
+  try {
+    const stdout = await new Promise<string>((resolve, reject) => {
+      execFile(cmd, ['api', 'GET', '/api/model'], { timeout: CLI_TIMEOUT_MS, windowsHide: true, maxBuffer: 4 * 1024 * 1024 },
+        (error, out) => (error ? reject(error) : resolve(out)));
+    });
+    const parsed = JSON.parse(stdout) as { data?: unknown };
+    const data = Array.isArray(parsed?.data) ? parsed.data : [];
+    const out: Record<string, string[]> = {};
+    for (const entry of data) {
+      if (typeof entry !== 'object' || entry === null) continue;
+      const providerID = (entry as { providerID?: unknown }).providerID;
+      const modelID = (entry as { modelID?: unknown }).modelID;
+      const variants = (entry as { variants?: unknown }).variants;
+      if (typeof providerID !== 'string' || typeof modelID !== 'string') continue;
+      const ids = Array.isArray(variants)
+        ? variants.map((v) => (typeof v === 'object' && v !== null ? (v as { id?: unknown }).id : null)).filter((x): x is string => typeof x === 'string')
+        : [];
+      if (ids.length) out[`${providerID}/${modelID}`] = ids;
+    }
+    return out;
+  } catch {
+    return {};
+  }
+};
+
 const refreshCatalog = async (): Promise<Exclude<Cache, null>> => {
   let lastError: unknown = null;
   for (const cmd of CLI_CANDIDATES()) {
     try {
       const stdout = await runOnce(cmd);
       const catalog = parseCatalogOutput(stdout);
-      return { catalog, checkedAt: new Date().toISOString() };
+      const variants = await fetchVariants(cmd);
+      return { catalog, checkedAt: new Date().toISOString(), variants };
     } catch (error) {
       lastError = error;
     }
@@ -82,8 +109,8 @@ const server = http.createServer(async (req, res) => {
     }
     if (url.pathname === '/models') {
       const force = url.searchParams.get('refresh') === 'true';
-      const { catalog, checkedAt } = await getCatalog(force);
-      send(res, 200, { ok: true, catalog, checkedAt, source: 'opencode models' });
+      const { catalog, checkedAt, variants } = await getCatalog(force);
+      send(res, 200, { ok: true, catalog, checkedAt, variants, source: 'opencode models' });
       return;
     }
     if (url.pathname === '/switch-model' && req.method === 'POST') {

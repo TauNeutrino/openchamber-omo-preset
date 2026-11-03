@@ -116,6 +116,7 @@ let pickerFilter = '';
 let pickerAppliedFilter = '';
 let pickerDebounce: ReturnType<typeof setTimeout> | 0 = 0;
 let modelCatalog: string[] = [];
+let modelVariants: Record<string, string[]> = {};
 
 const regroupSessions = (): void => {
   if (!lastSessionSnapshot) return;
@@ -677,15 +678,40 @@ const paintReady = (panel: HTMLElement, model: ReadyModel): void => {
       list.append(element('div', 'picker-empty', emptyMsg));
     } else {
       for (const m of items) {
+        const row = element('div', 'picker-row');
         const opt = element('button', 'picker-option', m);
         opt.type = 'button';
-        if (m === modelPicker.currentModel) opt.classList.add('is-current');
+        if (m === modelPicker.currentModel) {
+          opt.classList.add('is-current');
+          row.classList.add('is-current-row');
+        }
         opt.addEventListener('click', () => { void applyPickedModel(m); });
-        list.append(opt);
+        row.append(opt);
+        const variants = modelVariants[m] ?? [];
+        if (variants.length) {
+          const vwrap = element('span', 'picker-variants');
+          for (const v of variants) {
+            const pill = element('button', 'variant-pill', v);
+            pill.type = 'button';
+            if (m === modelPicker.currentModel && v === modelPicker.currentVariant) pill.classList.add('is-active');
+            pill.addEventListener('click', (e) => {
+              e.stopPropagation();
+              void applyPickedModel(m, v);
+            });
+            vwrap.append(pill);
+          }
+          row.append(vwrap);
+        }
+        list.append(row);
       }
     }
     box.append(list);
     panel.append(box);
+    // Scroll to the currently selected model (center).
+    setTimeout(() => {
+      const node = list.querySelector('.is-current-row') as HTMLElement | null;
+      if (node) node.scrollIntoView({ block: 'center' });
+    }, 0);
   }
 };
 
@@ -852,6 +878,7 @@ const refreshModelCheck = (refs: readonly string[], options: { background?: bool
       const audit = auditModelRefs(refs, answer.catalog as string[], answer.checkedAt ?? null);
       modelCheck = { kind: 'done', audit };
       modelCatalog = answer.catalog as string[];
+      modelVariants = (answer as { variants?: Record<string, string[]> }).variants ?? {};
       paint();
       scheduleModelCheck(refs);
     })
@@ -873,6 +900,7 @@ const fetchModelCatalog = async (): Promise<void> => {
     const answer = JSON.parse(result.body) as { ok?: boolean; catalog?: unknown };
     if (answer.ok && Array.isArray(answer.catalog)) {
       modelCatalog = answer.catalog as string[];
+      modelVariants = (answer as { variants?: Record<string, string[]> }).variants ?? {};
       paint();
     }
   } catch {
@@ -908,14 +936,14 @@ const closeModelPicker = (): void => {
   if (pickerDebounce) { clearTimeout(pickerDebounce); pickerDebounce = 0; }
 };
 
-const applyPickedModel = async (picked: string): Promise<void> => {
+const applyPickedModel = async (picked: string, variant?: string): Promise<void> => {
   if (!modelPicker) return;
-  const { agent, presetName, targetPath, currentVariant } = modelPicker;
+  const { agent, presetName, targetPath } = modelPicker;
   try {
     const file = await readConfigFile(targetPath);
     if (file.kind === 'missing') throw new Error(t('fileNotFound', targetPath));
     if (file.kind === 'failed') throw new Error(file.message);
-    const next = applyAgentModelToText(file.raw, presetName, agent, picked, currentVariant);
+    const next = applyAgentModelToText(file.raw, presetName, agent, picked, variant ?? '');
     await host.writeFile(targetPath, next);
     closeModelPicker();
     await loadAndPaint();
