@@ -164,10 +164,10 @@
         background: color-mix(in srgb, var(--oc-info, #4a9eff) 18%, transparent);
         color: var(--oc-info, #4a9eff);
       }
-      .picker-row { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+      .picker-row { display: flex; align-items: center; gap: 4px; flex-shrink: 0; flex-wrap: nowrap; }
       .picker-row.is-current-row { background: var(--oc-hover, rgba(127,127,127,0.08)); border-radius: 4px; }
-      .picker-variants { display: inline-flex; gap: 2px; flex-wrap: wrap; }
-      .variant-pill { border: 1px solid var(--oc-border, rgba(127,127,127,0.28)); background: transparent; color: var(--oc-muted, #999); padding: 0 5px; border-radius: 999px; font-size: 9.5px; cursor: pointer; line-height: 1.6; }
+      .picker-variants { display: inline-flex; gap: 2px; flex-wrap: nowrap; overflow: hidden; }
+      .variant-pill { border: 1px solid var(--oc-border, rgba(127,127,127,0.28)); background: transparent; color: var(--oc-muted, #999); padding: 0 3px; border-radius: 999px; font-size: 9px; cursor: pointer; line-height: 1.5; }
       .variant-pill:hover { color: var(--oc-fg, #ddd); border-color: var(--oc-fg, #ddd); }
       .variant-pill.is-active { background: var(--oc-info, #4a9eff); color: #fff; border-color: var(--oc-info, #4a9eff); }
       .settings-box {
@@ -428,6 +428,6 @@
   </head>
   <body>
     <div id="root"></div>
-    <script src="main.js?v=1.4.1"></script>
+    <script src="main.js?v=1.4.2"></script>
   </body>
 </html>
