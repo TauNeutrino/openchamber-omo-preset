@@ -71,10 +71,11 @@ export type AgentSessionGroups = {
 };
 
 export const groupAgentSessions = (
-  sessions: AgentSession[], projectId: string, directory: string, now: number = Date.now(),
+  sessions: AgentSession[], projectId: string, directory: string,
+  now: number = Date.now(), windowMs: number = FINISHED_WINDOW_MS,
 ): Map<string, AgentSessionGroups> => {
   const groups = new Map<string, AgentSessionGroups>();
-  const windowStart = now - FINISHED_WINDOW_MS;
+  const windowStart = now - windowMs;
   for (const session of sessions) {
     if (session.projectId !== projectId || !sameDirectory(session.directory, directory)
       || session.parentId === null || session.archivedAt !== null

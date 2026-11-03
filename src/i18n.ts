@@ -101,6 +101,8 @@ const de: Dictionary = {
   globalLayer: 'Global',
   noProjectOpenTitle: 'Kein Projekt geöffnet',
   orchestratorModelHint: (m: string) => m,
+  settings: 'Einstellungen',
+  finishedSessionsWindow: 'Beendete Sessions anzeigen (Stunden)',
 };
 
 const en: Dictionary = {
@@ -185,6 +187,8 @@ const en: Dictionary = {
   globalLayer: 'Global',
   noProjectOpenTitle: 'No project open',
   orchestratorModelHint: (m: string) => m,
+  settings: 'Settings',
+  finishedSessionsWindow: 'Show finished sessions (hours)',
 };
 
 const dictionaries: Record<Locale, Dictionary> = { de, en };

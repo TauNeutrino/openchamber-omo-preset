@@ -76,6 +76,7 @@ let directory: string | null = null;
 let surface: HostReadyContext['surface'] = 'panel';
 let screen: Screen = { kind: 'loading' };
 let interaction: Interaction = { kind: 'browse' };
+let settingsOpen = false;
 let listOpen = false;
 let noticeDismissTimer: ReturnType<typeof setTimeout> | null = null;
 let notice: Notice | null = null;
@@ -103,6 +104,8 @@ let mounted: Array<{ dispose: () => void }> = [];
 let agentSessions = new Map<string, AgentSessionGroups>();
 /** Finished sessions hidden early (eye button); a new activity on a hidden session clears it. */
 const dismissedSessions = new Set<string>();
+/** Hours a finished session stays visible. Configurable via panel settings. */
+let finishedWindowHours = 8;
 /** Current OpenCode session, for optional model switching after a preset change. */
 let currentSessionId: string | null = null;
 let currentSessionAgent: string | null = null;
@@ -555,6 +558,37 @@ const paintReady = (panel: HTMLElement, model: ReadyModel): void => {
     for (const agent of model.view.agents) agents.append(agentRow(agent));
   }
   panel.append(agents);
+
+  // Einstellungen (einklappbar).
+  const settings = element('div', 'settings');
+  const settingsToggle = element('button', 'settings-toggle', settingsOpen ? `▾ ${t('settings')}` : `▸ ${t('settings')}`);
+  settingsToggle.type = 'button';
+  settingsToggle.addEventListener('click', () => {
+    settingsOpen = !settingsOpen;
+    paint();
+  });
+  settings.append(settingsToggle);
+  if (settingsOpen) {
+    const row = element('div', 'setting-row');
+    row.append(element('span', 'setting-label', t('finishedSessionsWindow')));
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.min = '1';
+    input.max = '72';
+    input.value = String(finishedWindowHours);
+    input.className = 'setting-input';
+    input.addEventListener('change', () => {
+      const v = parseInt(input.value, 10);
+      if (Number.isFinite(v) && v >= 1 && v <= 72) {
+        finishedWindowHours = v;
+        void host.storage.set('finishedWindowHours', v).catch(() => undefined);
+        paint();
+      }
+    });
+    row.append(input);
+    settings.append(row);
+  }
+  panel.append(settings);
 };
 
 const paintLoading = (panel: HTMLElement): void => {
@@ -633,7 +667,7 @@ const watchSessions = (currentDirectory: string | null): void => {
       const unsubscribe = await host.onSessions(projectId, (snapshot) => {
         if (token !== sessionsToken || subscription !== subscriptionToken || subscribedProject !== projectId || snapshot.projectId !== projectId) return;
         const records = snapshot.sessions.filter((session) => session.projectId === projectId);
-        const next = groupAgentSessions(records as AgentSession[], projectId, currentDirectory);
+const next = groupAgentSessions(records as AgentSession[], projectId, currentDirectory, Date.now(), finishedWindowHours * 60 * 60 * 1000);
         // Avoid stealing focus on unchanged host updates.
         const signature = (groups: Map<string, AgentSessionGroups>): string => JSON.stringify([...groups].map(([name, entries]) => [
           name,
@@ -940,6 +974,12 @@ host.onReady((ctx) => {
   applyHostReady(ctx, document.documentElement);
   setLocale(ctx.locale);
   surface = ctx.surface;
+  // Lade gespeicherte Einstellungen.
+  void host.storage.get('finishedWindowHours').then((value) => {
+    if (typeof value === 'number' && value >= 1 && value <= 72) {
+      finishedWindowHours = value;
+    }
+  }).catch(() => undefined);
   const nextDirectory = ctx.directory;
   if (!didMount) {
     didMount = true;

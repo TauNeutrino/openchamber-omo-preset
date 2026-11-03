@@ -139,6 +139,12 @@
         padding-top: 1px;
       }
       .agents-empty { grid-column: 1 / -1; font-size: 11px; color: var(--oc-muted, #999); }
+      .settings { margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--oc-border, rgba(127, 127, 127, 0.22)); font-size: 11px; }
+      .settings-toggle { border: 0; background: none; color: var(--oc-muted, #999); cursor: pointer; font-size: 10.5px; padding: 2px 0; }
+      .settings-toggle:hover { color: var(--oc-fg, #ddd); }
+      .setting-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 4px; }
+      .setting-label { color: var(--oc-muted, #999); }
+      .setting-input { width: 60px; padding: 2px 4px; border: 1px solid var(--oc-border, rgba(127, 127, 127, 0.28)); border-radius: 4px; background: transparent; color: var(--oc-fg, #ddd); font-size: 11px; }
       .agent-group, .agent { display: contents; }
       .agent-disclosure { grid-column: 1; }
       .agent-name { grid-column: 1; }
@@ -386,6 +392,6 @@
   </head>
   <body>
     <div id="root"></div>
-    <script src="main.js?v=1.2.2"></script>
+    <script src="main.js?v=1.2.3"></script>
   </body>
 </html>
