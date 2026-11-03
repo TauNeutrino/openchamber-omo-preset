@@ -1124,6 +1124,10 @@ document.addEventListener('click', (event) => {
     settingsOpen = false;
     paint();
   }
+  if (modelPicker && !target.closest('.model-picker')) {
+    closeModelPicker();
+    paint();
+  }
   if (!listOpen) return;
   if (target.closest('.active-row') || target.closest('.preset-list')) return;
   listOpen = false;
