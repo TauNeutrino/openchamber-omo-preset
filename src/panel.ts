@@ -1118,7 +1118,7 @@ const applyPreset = async (name: string): Promise<void> => {
   notice = null;
   paint();
 
-  const expected = resolveWriteTarget(model.global, model.project);
+  const expected = resolveWriteTarget(model.global, model.project, name);
   const startDirectory = directory;
 
   // Re-read before writing: a concurrent edit must not be overwritten with a
@@ -1142,8 +1142,11 @@ const applyPreset = async (name: string): Promise<void> => {
     return;
   }
 
-  const target: WriteTarget = resolveWriteTarget(layers.global, layers.project);
-  if (target.kind !== expected.kind) {
+  const target: WriteTarget = resolveWriteTarget(layers.global, layers.project, name);
+  // Switching to a project-only preset legitimately moves the write target
+  // from the global layer to the project layer; that is not a concurrent edit.
+  const layerChanged = target.kind !== expected.kind && !(expected.kind === 'global' && target.kind === 'project' && target.availableNames.includes(name));
+  if (layerChanged) {
     interaction = { kind: 'browse' };
     notice = {
       tone: 'error',

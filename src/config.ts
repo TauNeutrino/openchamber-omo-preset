@@ -311,9 +311,14 @@ export const resolvePresetView = (
  * names that layer accepts so the caller can refuse an unknown preset without
  * touching the file.
  */
-export const resolveWriteTarget = (global: ParsedLayer, project: ParsedLayer | null): WriteTarget => (
-  writeNamesFor(global, project)
-);
+export const resolveWriteTarget = (global: ParsedLayer, project: ParsedLayer | null, name?: string): WriteTarget => {
+  // A preset that only exists in the project layer must be written there,
+  // even when the project does not currently override the active preset.
+  if (name && project?.config.hasPresets && project.config.presetNames.includes(name)) {
+    return { kind: 'project', path: project.path, availableNames: project.config.presetNames };
+  }
+  return writeNamesFor(global, project);
+};
 
 export const writeTargetAccepts = (target: WriteTarget, name: string): boolean => (
   target.availableNames.includes(name)
