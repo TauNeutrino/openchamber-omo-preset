@@ -333,6 +333,40 @@ export const sortedPresetNames = (presets: Record<string, PresetAgent[]>): strin
   Object.keys(presets).sort((left, right) => left.localeCompare(right))
 );
 
+export const addPresetToText = (
+  raw: string, name: string, agents: PresetAgent[],
+): string => {
+  const nextName = name.trim();
+  if (!nextName) throw new Error(t('presetNameEmpty'));
+  const before = parseConfigText(raw, t('configLabel'));
+  if (!before.ok) throw new Error(before.error);
+  if (before.config.presetNames.includes(nextName)) throw new Error(t('presetAlreadyExists', nextName));
+
+  const hasBom = raw.startsWith(BOM);
+  const content = hasBom ? raw.slice(1) : raw;
+  const fmt = formattingFor(content);
+
+  const agentObj: Record<string, { model: string; variant?: string }> = {};
+  for (const a of agents) {
+    agentObj[a.agent] = a.variant ? { model: a.model, variant: a.variant } : { model: a.model };
+  }
+
+  let next: string;
+  if (before.config.commentOnly || !before.config.hasPresets) {
+    const prefix = content.trimEnd();
+    const body = JSON.stringify({ presets: { [nextName]: agentObj } }, null, fmt.tabSize || 2);
+    next = `${prefix ? `${prefix}${fmt.eol}` : ''}${body}${fmt.eol}`;
+  } else {
+    const edits = modify(content, ['presets', nextName], agentObj, { formattingOptions: fmt });
+    next = applyEdits(content, edits);
+  }
+
+  const after = parseConfigText(next, t('resultLabel'));
+  if (!after.ok) throw new Error(`Die Änderung würde die Konfiguration beschädigen: ${after.error}`);
+  if (!after.config.presetNames.includes(nextName)) throw new Error(t('changeNotVerified'));
+  return hasBom ? `${BOM}${next}` : next;
+};
+
 export const applyAgentModelToText = (
   raw: string, presetName: string, agentName: string, model: string, variant?: string | null,
 ): string => {

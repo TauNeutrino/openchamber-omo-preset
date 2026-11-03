@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { applyAgentModelToText } from '../src/config.ts';
+import { addPresetToText, applyAgentModelToText } from '../src/config.ts';
 
 const CONFIG = `{
   "preset": "default",
@@ -42,4 +42,30 @@ test('applyAgentModelToText preserves comments', () => {
 
 test('applyAgentModelToText refuses unknown preset', () => {
   assert.throws(() => applyAgentModelToText(CONFIG, 'nope', 'coder', 'x/y'));
+});
+
+const CONFIG2 = `{
+  "preset": "default",
+  "presets": {
+    "default": {
+      "orchestrator": { "model": "anthropic/claude-sonnet-4", "variant": "high" }
+    }
+  }
+}`;
+
+test('addPresetToText adds a new preset', () => {
+  const next = addPresetToText(CONFIG2, 'clone', [{ agent: 'orchestrator', model: 'openai/gpt-4o' }]);
+  assert.match(next, /"clone"/);
+  assert.match(next, /"openai\/gpt-4o"/);
+  assert.match(next, /"default"/);
+});
+
+test('addPresetToText refuses duplicate name', () => {
+  assert.throws(() => addPresetToText(CONFIG2, 'default', [{ agent: 'orchestrator', model: 'x/y' }]));
+});
+
+test('addPresetToText works on empty file', () => {
+  const next = addPresetToText('', 'new', [{ agent: 'orchestrator', model: 'a/b' }]);
+  assert.match(next, /"presets"/);
+  assert.match(next, /"new"/);
 });

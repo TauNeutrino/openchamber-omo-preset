@@ -104,6 +104,13 @@ const de: Dictionary = {
   orchestratorModelHint: (m: string) => m,
   settings: 'Einstellungen',
   finishedSessionsWindow: 'Beendete Sessions anzeigen (Stunden)',
+  presetAlreadyExists: (name: string) => `Preset „${name}“ existiert bereits.`,
+  clonePreset: 'Preset klonen',
+  cloneGlobal: 'Global',
+  cloneProject: 'Projekt',
+  cloneName: 'Name des neuen Presets',
+  cloneCreate: 'Anlegen',
+  cloneSuccess: (name: string) => `Preset „${name}“ angelegt`,
   presetEditingEnabled: 'Preset-Bearbeitung erlauben (Modelle ändern)',
 };
 
@@ -192,6 +199,13 @@ const en: Dictionary = {
   orchestratorModelHint: (m: string) => m,
   settings: 'Settings',
   finishedSessionsWindow: 'Show finished sessions (hours)',
+  presetAlreadyExists: (name: string) => `Preset "${name}" already exists.`,
+  clonePreset: 'Clone preset',
+  cloneGlobal: 'Global',
+  cloneProject: 'Project',
+  cloneName: 'Name of the new preset',
+  cloneCreate: 'Create',
+  cloneSuccess: (name: string) => `Preset "${name}" created`,
   presetEditingEnabled: 'Allow preset editing (change models)',
 };
 

@@ -161,6 +161,8 @@
         color: var(--oc-muted, #999);
         pointer-events: none;
       }
+      .clone-btn { border: 0; background: transparent; color: var(--oc-muted, #999); cursor: pointer; font-size: 12px; padding: 0 2px; flex-shrink: 0; }
+      .clone-btn:hover { color: var(--oc-fg, #ddd); }
       .origin-badge.is-project {
         background: color-mix(in srgb, var(--oc-info, #4a9eff) 18%, transparent);
         color: var(--oc-info, #4a9eff);
@@ -430,6 +432,6 @@
   </head>
   <body>
     <div id="root"></div>
-    <script src="main.js?v=1.4.7"></script>
+    <script src="main.js?v=1.5.0"></script>
   </body>
 </html>

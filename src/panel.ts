@@ -9,6 +9,7 @@ import {
 } from '@openchamber/sdk/ui';
 
 import {
+  addPresetToText,
   applyAgentModelToText,
   applyPresetToText,
   orchestratorModel,
@@ -117,6 +118,7 @@ let pickerAppliedFilter = '';
 let pickerDebounce: ReturnType<typeof setTimeout> | 0 = 0;
 let modelCatalog: string[] = [];
 let modelVariants: Record<string, string[]> = {};
+let cloneState: { source: string; scope: 'global' | 'project' | null; name: string } | null = null;
 
 const regroupSessions = (): void => {
   if (!lastSessionSnapshot) return;
@@ -418,6 +420,18 @@ const paintPresetList = (parent: Element, model: ReadyModel, busy: boolean): voi
     if (origin === 'project') badge.classList.add('is-project');
     option.append(badge);
     if (active) option.append(element('span', 'option-check', '✓'));
+    if (presetEditingEnabled) {
+      const cloneBtn = element('button', 'clone-btn', '🗐');
+      cloneBtn.type = 'button';
+      cloneBtn.title = t('clonePreset');
+      cloneBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        cloneState = { source: name, scope: null, name: '' };
+        listOpen = false;
+        paint();
+      });
+      option.append(cloneBtn);
+    }
     option.addEventListener('click', () => {
       listOpen = false;
       if (name === model.view.active.name) {
@@ -617,6 +631,44 @@ const paintReady = (panel: HTMLElement, model: ReadyModel): void => {
     });
     editRow.append(checkbox);
     box.append(editRow);
+    panel.append(box);
+  }
+
+  if (cloneState) {
+    const box = element('div', 'settings-box');
+    box.append(element('div', 'confirm-title', t('clonePreset')));
+    box.append(element('div', 'confirm-body', `${cloneState.source}`));
+    if (cloneState.scope === null) {
+      const row = element('div', 'setting-row');
+      const gBtn = element('button', 'icon-btn', t('cloneGlobal'));
+      gBtn.type = 'button';
+      gBtn.addEventListener('click', () => { if (cloneState) { cloneState.scope = 'global'; paint(); } });
+      const pBtn = element('button', 'icon-btn', t('cloneProject'));
+      pBtn.type = 'button';
+      pBtn.addEventListener('click', () => { if (cloneState) { cloneState.scope = 'project'; paint(); } });
+      row.append(gBtn, pBtn);
+      box.append(row);
+    } else {
+      const row = element('div', 'setting-row');
+      row.append(element('span', 'setting-label', t('cloneName')));
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'setting-input';
+      input.style.width = '140px';
+      input.value = cloneState.name;
+      input.addEventListener('input', () => { if (cloneState) cloneState.name = input.value; });
+      row.append(input);
+      box.append(row);
+      const actions = element('div', 'confirm-actions');
+      const cancel = element('button', 'icon-btn', t('cancel'));
+      cancel.type = 'button';
+      cancel.addEventListener('click', () => { cloneState = null; paint(); });
+      const create = element('button', 'icon-btn', t('cloneCreate'));
+      create.type = 'button';
+      create.addEventListener('click', () => { void doClone(model); });
+      actions.append(cancel, create);
+      box.append(actions);
+    }
     panel.append(box);
   }
 
@@ -957,6 +1009,39 @@ const applyPickedModel = async (picked: string, variant?: string): Promise<void>
     autoDismissNotice(5000);
   }
 };
+const doClone = async (model: ReadyModel): Promise<void> => {
+  if (!cloneState) return;
+  const source = cloneState.source;
+  const scope = cloneState.scope;
+  const trimmed = cloneState.name.trim();
+  if (!trimmed || !scope) return;
+  const agents = model.view.presets[source] ?? [];
+  if (agents.length === 0) {
+    notice = { tone: 'error', title: t('presetNotChanged'), body: t('noAgentsConfigured') };
+    paint();
+    autoDismissNotice(5000);
+    return;
+  }
+  const targetPath = scope === 'global'
+    ? model.global.path
+    : (model.project?.path ?? PROJECT_PATHS[0]);
+  try {
+    const file = await readConfigFile(targetPath);
+    const raw = file.kind === 'file' ? file.raw : '';
+    const next = addPresetToText(raw, trimmed, agents);
+    await host.writeFile(targetPath, next);
+    cloneState = null;
+    notice = { tone: 'success', title: t('cloneSuccess', trimmed), body: targetPath };
+    paint();
+    autoDismissNotice(5000);
+    await loadAndPaint();
+  } catch (error) {
+    notice = { tone: 'error', title: t('presetNotChanged'), body: errorText(error) };
+    paint();
+    autoDismissNotice(5000);
+  }
+};
+
 const auditRefsFor = (view: PresetView, project: ParsedLayer | null): string[] => collectModelRefs(
   view.agents,
   [
