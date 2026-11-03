@@ -557,30 +557,20 @@ const paintReady = (panel: HTMLElement, model: ReadyModel): void => {
     void loadAndPaint();
   });
   activeRow.append(refresh);
-  panel.append(activeRow);
-
-  if (listOpen) paintPresetList(panel, model, busy);
-
-  if (notice) paintBanner(panel, notice);
-
-  const agents = element('div', 'agents');
-  if (model.view.agents.length === 0) {
-    agents.append(element('div', 'agents-empty', t('noAgentsConfigured')));
-  } else {
-    for (const agent of model.view.agents) agents.append(agentRow(agent));
-  }
-  panel.append(agents);
-
-  // Einstellungen (einklappbar).
-  const settings = element('div', 'settings');
-  const settingsToggle = element('button', 'settings-toggle', settingsOpen ? `▾ ${t('settings')}` : `▸ ${t('settings')}`);
-  settingsToggle.type = 'button';
-  settingsToggle.addEventListener('click', () => {
+  const gear = element('button', 'icon-btn settings-btn', '⚙');
+  gear.type = 'button';
+  gear.title = t('settings');
+  gear.setAttribute('aria-label', t('settings'));
+  gear.setAttribute('aria-expanded', String(settingsOpen));
+  gear.addEventListener('click', () => {
     settingsOpen = !settingsOpen;
     paint();
   });
-  settings.append(settingsToggle);
+  activeRow.append(gear);
+  panel.append(activeRow);
+
   if (settingsOpen) {
+    const box = element('div', 'settings-box');
     const row = element('div', 'setting-row');
     row.append(element('span', 'setting-label', t('finishedSessionsWindow')));
     const input = document.createElement('input');
@@ -594,9 +584,21 @@ const paintReady = (panel: HTMLElement, model: ReadyModel): void => {
       if (v !== null) applyFinishedWindow(v);
     });
     row.append(input);
-    settings.append(row);
+    box.append(row);
+    panel.append(box);
   }
-  panel.append(settings);
+
+  if (listOpen) paintPresetList(panel, model, busy);
+
+  if (notice) paintBanner(panel, notice);
+
+  const agents = element('div', 'agents');
+  if (model.view.agents.length === 0) {
+    agents.append(element('div', 'agents-empty', t('noAgentsConfigured')));
+  } else {
+    for (const agent of model.view.agents) agents.append(agentRow(agent));
+  }
+  panel.append(agents);
 };
 
 const paintLoading = (panel: HTMLElement): void => {
@@ -970,9 +972,13 @@ document.addEventListener('keydown', (event) => {
 // A click listener, not pointerdown: closing must not remove the element the
 // user just pressed before its own click handler runs.
 document.addEventListener('click', (event) => {
-  if (!listOpen) return;
   const target = event.target;
   if (!(target instanceof Element)) return;
+  if (settingsOpen && !target.closest('.settings-box') && !target.closest('.settings-btn')) {
+    settingsOpen = false;
+    paint();
+  }
+  if (!listOpen) return;
   if (target.closest('.active-row') || target.closest('.preset-list')) return;
   listOpen = false;
   paint();
@@ -988,6 +994,8 @@ const parseWindowHours = (raw: unknown): number | null => {
 const applyFinishedWindow = (hours: number): void => {
   if (hours === finishedWindowHours) return;
   finishedWindowHours = hours;
+  // Persistiert für später; sofortige Wirkung kommt aus dem Regruppieren.
+  void host.storage.set('finishedWindowHours', hours).catch(() => undefined);
   if (didMount) {
     regroupSessions();
     if (!listOpen && interaction.kind === 'browse') paint();
