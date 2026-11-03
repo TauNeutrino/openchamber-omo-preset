@@ -76,8 +76,8 @@ let directory: string | null = null;
 let surface: HostReadyContext['surface'] = 'panel';
 let screen: Screen = { kind: 'loading' };
 let interaction: Interaction = { kind: 'browse' };
-let settingsOpen = false;
 let listOpen = false;
+let settingsOpen = false;
 let noticeDismissTimer: ReturnType<typeof setTimeout> | null = null;
 let notice: Notice | null = null;
 let loadToken = 0;
@@ -104,8 +104,20 @@ let mounted: Array<{ dispose: () => void }> = [];
 let agentSessions = new Map<string, AgentSessionGroups>();
 /** Finished sessions hidden early (eye button); a new activity on a hidden session clears it. */
 const dismissedSessions = new Set<string>();
-/** Hours a finished session stays visible. Configurable via panel settings. */
+/** Hours a finished session stays visible. Configurable in the panel's settings section. */
 let finishedWindowHours = 8;
+/** Last session snapshot as delivered by the host, for regrouping when the window changes. */
+let lastSessionSnapshot: { records: AgentSession[]; projectId: string; directory: string } | null = null;
+
+const regroupSessions = (): void => {
+  if (!lastSessionSnapshot) return;
+  const next = groupAgentSessions(
+    lastSessionSnapshot.records, lastSessionSnapshot.projectId, lastSessionSnapshot.directory,
+    Date.now(), finishedWindowHours * 60 * 60 * 1000,
+  );
+  agentSessions = next;
+  if (openAgent !== undefined && !next.has(openAgent)) openAgent = undefined;
+};
 /** Current OpenCode session, for optional model switching after a preset change. */
 let currentSessionId: string | null = null;
 let currentSessionAgent: string | null = null;
@@ -578,12 +590,8 @@ const paintReady = (panel: HTMLElement, model: ReadyModel): void => {
     input.value = String(finishedWindowHours);
     input.className = 'setting-input';
     input.addEventListener('change', () => {
-      const v = parseInt(input.value, 10);
-      if (Number.isFinite(v) && v >= 1 && v <= 72) {
-        finishedWindowHours = v;
-        void host.storage.set('finishedWindowHours', v).catch(() => undefined);
-        paint();
-      }
+      const v = parseWindowHours(input.value);
+      if (v !== null) applyFinishedWindow(v);
     });
     row.append(input);
     settings.append(row);
@@ -667,7 +675,8 @@ const watchSessions = (currentDirectory: string | null): void => {
       const unsubscribe = await host.onSessions(projectId, (snapshot) => {
         if (token !== sessionsToken || subscription !== subscriptionToken || subscribedProject !== projectId || snapshot.projectId !== projectId) return;
         const records = snapshot.sessions.filter((session) => session.projectId === projectId);
-const next = groupAgentSessions(records as AgentSession[], projectId, currentDirectory, Date.now(), finishedWindowHours * 60 * 60 * 1000);
+        lastSessionSnapshot = { records: records as AgentSession[], projectId, directory: currentDirectory };
+        const next = groupAgentSessions(records as AgentSession[], projectId, currentDirectory, Date.now(), finishedWindowHours * 60 * 60 * 1000);
         // Avoid stealing focus on unchanged host updates.
         const signature = (groups: Map<string, AgentSessionGroups>): string => JSON.stringify([...groups].map(([name, entries]) => [
           name,
@@ -970,16 +979,35 @@ document.addEventListener('click', (event) => {
 });
 
 let didMount = false;
-host.onReady((ctx) => {
+
+const parseWindowHours = (raw: unknown): number | null => {
+  const n = typeof raw === 'string' ? parseInt(raw, 10) : typeof raw === 'number' ? raw : NaN;
+  return Number.isFinite(n) && n >= 1 && n <= 72 ? n : null;
+};
+
+const applyFinishedWindow = (hours: number): void => {
+  if (hours === finishedWindowHours) return;
+  finishedWindowHours = hours;
+  if (didMount) {
+    regroupSessions();
+    if (!listOpen && interaction.kind === 'browse') paint();
+  }
+};
+
+host.onReady(async (ctx) => {
   applyHostReady(ctx, document.documentElement);
   setLocale(ctx.locale);
   surface = ctx.surface;
-  // Lade gespeicherte Einstellungen.
-  void host.storage.get('finishedWindowHours').then((value) => {
-    if (typeof value === 'number' && value >= 1 && value <= 72) {
-      finishedWindowHours = value;
-    }
-  }).catch(() => undefined);
+  // Bevorzugt die auf der OpenChamber-Settings-Seite gesetzten Werte,
+  // sonst der Endpoint-Value aus host.storage (frühere Version).
+  const fromSettings = parseWindowHours(ctx.settings?.finishedWindowHours);
+  const fromStorage = await host.storage.get('finishedWindowHours').catch(() => undefined);
+  const resolved = fromSettings ?? parseWindowHours(fromStorage) ?? 8;
+  if (!didMount) {
+    finishedWindowHours = resolved;
+  } else {
+    applyFinishedWindow(resolved);
+  }
   const nextDirectory = ctx.directory;
   if (!didMount) {
     didMount = true;
@@ -993,6 +1021,11 @@ host.onReady((ctx) => {
     watchSessions(directory);
     void loadAndPaint();
   }
+});
+
+host.onSettings((settings) => {
+  const hours = parseWindowHours(typeof settings.finishedWindowHours === 'string' || typeof settings.finishedWindowHours === 'number' ? settings.finishedWindowHours : undefined);
+  if (hours !== null) applyFinishedWindow(hours);
 });
 
 host.onDirectory((next) => {
