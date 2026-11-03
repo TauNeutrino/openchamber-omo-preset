@@ -629,13 +629,36 @@ const paintReady = (panel: HTMLElement, model: ReadyModel): void => {
   if (modelPicker) {
     const box = element('div', 'model-picker');
     const head = element('div', 'picker-head');
-    head.append(element('span', 'picker-title', `${modelPicker.agent} · ${modelPicker.presetName}`));
+    head.append(element('span', 'picker-title', `${modelPicker.agent} · ${modelCatalog.length} Modelle`));
     const close = element('button', 'icon-btn', '×');
     close.type = 'button';
     close.title = t('cancel');
     close.addEventListener('click', () => { closeModelPicker(); paint(); });
     head.append(close);
     box.append(head);
+    // Unsichtbares Eingabefeld, damit Tastatureingabe zuverlässig erfasst wird
+    // (kein sichtbares Input-Feld, nur die Modellliste).
+    const hiddenInput = document.createElement('input');
+    hiddenInput.type = 'text';
+    hiddenInput.className = 'picker-hidden-input';
+    hiddenInput.value = pickerFilter;
+    hiddenInput.setAttribute('aria-hidden', 'true');
+    hiddenInput.tabIndex = -1;
+    hiddenInput.style.position = 'absolute';
+    hiddenInput.style.opacity = '0';
+    hiddenInput.style.width = '1px';
+    hiddenInput.style.height = '1px';
+    hiddenInput.style.border = '0';
+    hiddenInput.style.padding = '0';
+    hiddenInput.style.pointerEvents = 'none';
+    hiddenInput.addEventListener('input', () => {
+      pickerFilter = hiddenInput.value;
+      if (pickerDebounce) { clearTimeout(pickerDebounce); pickerDebounce = 0; }
+      pickerDebounce = setTimeout(() => { pickerAppliedFilter = pickerFilter; paint(); }, 500);
+      paint();
+    });
+    box.append(hiddenInput);
+    setTimeout(() => { try { hiddenInput.focus(); } catch {} }, 0);
     if (pickerFilter) {
       box.append(element('div', 'picker-filter', `Filter: ${pickerFilter}`));
     }
@@ -643,7 +666,7 @@ const paintReady = (panel: HTMLElement, model: ReadyModel): void => {
     const filter = pickerAppliedFilter.toLowerCase();
     const items = modelCatalog.filter((m) => !filter || m.toLowerCase().includes(filter));
     if (items.length === 0) {
-      list.append(element('div', 'picker-empty', modelCatalog.length === 0 ? t('modelCheckUnavailable') : t('noModelsConfigured')));
+      list.append(element('div', 'picker-empty', modelCatalog.length === 0 ? t('modelCheckLabel') : t('noModelsConfigured')));
     } else {
       for (const m of items) {
         const opt = element('button', 'picker-option', m);
@@ -820,6 +843,7 @@ const refreshModelCheck = (refs: readonly string[], options: { background?: bool
       if (!answer.ok || !Array.isArray(answer.catalog)) throw new Error(t('catalogResponseUnintelligible'));
       const audit = auditModelRefs(refs, answer.catalog as string[], answer.checkedAt ?? null);
       modelCheck = { kind: 'done', audit };
+      modelCatalog = answer.catalog as string[];
       paint();
       scheduleModelCheck(refs);
     })
@@ -1089,27 +1113,8 @@ document.addEventListener('keydown', (event) => {
 // user just pressed before its own click handler runs.
 document.addEventListener('keydown', (event) => {
   if (!modelPicker) return;
-  const target = event.target;
-  if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) return;
   if (event.key === 'Escape') {
     closeModelPicker();
-    paint();
-    event.preventDefault();
-    return;
-  }
-  if (event.key === 'Backspace') {
-    pickerFilter = pickerFilter.slice(0, -1);
-    if (pickerDebounce) { clearTimeout(pickerDebounce); pickerDebounce = 0; }
-    pickerDebounce = setTimeout(() => { pickerAppliedFilter = pickerFilter; paint(); }, 500);
-    paint();
-    event.preventDefault();
-    return;
-  }
-  // Accept printable characters only.
-  if (event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
-    pickerFilter += event.key;
-    if (pickerDebounce) { clearTimeout(pickerDebounce); pickerDebounce = 0; }
-    pickerDebounce = setTimeout(() => { pickerAppliedFilter = pickerFilter; paint(); }, 500);
     paint();
     event.preventDefault();
   }
