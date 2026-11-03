@@ -1124,7 +1124,7 @@ document.addEventListener('click', (event) => {
     settingsOpen = false;
     paint();
   }
-  if (modelPicker && !target.closest('.model-picker')) {
+  if (modelPicker && !target.closest('.model-picker') && !target.closest('.agent-model.is-editable')) {
     closeModelPicker();
     paint();
   }
