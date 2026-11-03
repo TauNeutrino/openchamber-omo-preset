@@ -143,8 +143,8 @@
       .picker-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 4px; }
       .picker-title { font-weight: 600; color: var(--oc-fg, #ddd); }
       .picker-filter { font-size: 10px; color: var(--oc-muted, #999); margin-bottom: 4px; }
-      .picker-list { overflow-y: auto; display: flex; flex-direction: column; gap: 1px; flex: 1 1 auto; min-height: 0; }
-      .picker-option { text-align: left; border: 0; background: transparent; color: var(--oc-fg, #ddd); padding: 2px 6px; border-radius: 4px; cursor: pointer; font-family: var(--font-mono, monospace); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; box-sizing: border-box; }
+      .picker-list { overflow-y: auto; display: flex; flex-direction: column; gap: 0; flex: 1 1 auto; min-height: 0; }
+      .picker-option { text-align: left; border: 0; background: transparent; color: var(--oc-fg, #ddd); padding: 1px 6px; border-radius: 4px; cursor: pointer; font-family: var(--font-mono, monospace); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; box-sizing: border-box; }
       .picker-option:hover { background: var(--oc-hover, rgba(127,127,127,0.15)); }
       .picker-option.is-current { color: var(--oc-info, #4a9eff); font-weight: 600; }
       .picker-empty { color: var(--oc-muted, #999); font-size: 11px; padding: 4px 6px; }
@@ -407,6 +407,6 @@
   </head>
   <body>
     <div id="root"></div>
-    <script src="main.js?v=1.3.7"></script>
+    <script src="main.js?v=1.3.8"></script>
   </body>
 </html>
