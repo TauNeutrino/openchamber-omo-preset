@@ -666,7 +666,10 @@ const paintReady = (panel: HTMLElement, model: ReadyModel): void => {
     const filter = pickerAppliedFilter.toLowerCase();
     const items = modelCatalog.filter((m) => !filter || m.toLowerCase().includes(filter));
     if (items.length === 0) {
-      list.append(element('div', 'picker-empty', modelCatalog.length === 0 ? t('modelCheckLabel') : t('noModelsConfigured')));
+      const emptyMsg = modelCatalog.length === 0
+        ? t('modelCheckLabel')
+        : (pickerAppliedFilter ? t('noModelsMatchingFilter') : t('noModelsConfigured'));
+      list.append(element('div', 'picker-empty', emptyMsg));
     } else {
       for (const m of items) {
         const opt = element('button', 'picker-option', m);
