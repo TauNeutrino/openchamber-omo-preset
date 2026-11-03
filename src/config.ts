@@ -355,15 +355,21 @@ export const applyAgentModelToText = (
     : ['presets', presetName, agentName];
 
   const fmt = formattingFor(content);
-  let edits = modify(content, [...basePath, 'model'], nextModel, { formattingOptions: fmt });
+  let next = content;
+  const modelEdits = modify(next, [...basePath, 'model'], nextModel, { formattingOptions: fmt });
+  next = applyEdits(next, modelEdits);
   const v = variant?.trim() ?? '';
+  const agentBlock = wrapped
+    ? (isPlainObject(block.agents) ? (block.agents as Record<string, unknown>)[agentName] : null)
+    : (block as Record<string, unknown>)[agentName];
+  const hasVariant = isPlainObject(agentBlock) && Object.prototype.hasOwnProperty.call(agentBlock, 'variant');
   if (v) {
-    edits = edits.concat(modify(content, [...basePath, 'variant'], v, { formattingOptions: fmt }));
-  } else {
-    edits = edits.concat(modify(content, [...basePath, 'variant'], undefined, { formattingOptions: fmt }));
+    const variantEdits = modify(next, [...basePath, 'variant'], v, { formattingOptions: fmt });
+    next = applyEdits(next, variantEdits);
+  } else if (hasVariant) {
+    const variantEdits = modify(next, [...basePath, 'variant'], undefined, { formattingOptions: fmt });
+    next = applyEdits(next, variantEdits);
   }
-
-  const next = applyEdits(content, edits);
   const after = parseConfigText(next, t('resultLabel'));
   if (!after.ok) throw new Error(`Die Änderung würde die Konfiguration beschädigen: ${after.error}`);
   const agents = after.config.presets[presetName] ?? [];
