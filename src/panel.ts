@@ -681,6 +681,7 @@ const paintReady = (panel: HTMLElement, model: ReadyModel): void => {
         const row = element('div', 'picker-row');
         const opt = element('button', 'picker-option', m);
         opt.type = 'button';
+        opt.title = m;
         if (m === modelPicker.currentModel) {
           opt.classList.add('is-current');
           row.classList.add('is-current-row');
@@ -693,6 +694,7 @@ const paintReady = (panel: HTMLElement, model: ReadyModel): void => {
           for (const v of variants) {
             const pill = element('button', 'variant-pill', v);
             pill.type = 'button';
+            pill.title = `${m} (${v})`;
             if (m === modelPicker.currentModel && v === modelPicker.currentVariant) pill.classList.add('is-active');
             pill.addEventListener('click', (e) => {
               e.stopPropagation();

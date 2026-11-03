@@ -144,7 +144,7 @@
       .picker-title { font-weight: 600; color: var(--oc-fg, #ddd); }
       .picker-filter { font-size: 10px; color: var(--oc-muted, #999); margin-bottom: 4px; }
       .picker-list { overflow-y: auto; display: flex; flex-direction: column; gap: 0; flex: 1 1 auto; min-height: 0; }
-      .picker-option { text-align: left; border: 0; background: transparent; color: var(--oc-fg, #ddd); padding: 1px 6px; border-radius: 4px; cursor: pointer; font-family: var(--font-mono, monospace); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; box-sizing: border-box; }
+      .picker-option { text-align: right; border: 0; background: transparent; color: var(--oc-fg, #ddd); padding: 1px 6px; border-radius: 4px; cursor: pointer; font-family: var(--font-mono, monospace); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; box-sizing: border-box; flex: 1 1 auto; min-width: 0; direction: rtl; unicode-bidi: plaintext; }
       .picker-option:hover { background: var(--oc-hover, rgba(127,127,127,0.15)); }
       .picker-option.is-current { color: var(--oc-info, #4a9eff); font-weight: 600; }
       .picker-empty { color: var(--oc-muted, #999); font-size: 11px; padding: 4px 6px; }
@@ -428,6 +428,6 @@
   </head>
   <body>
     <div id="root"></div>
-    <script src="main.js?v=1.4.0"></script>
+    <script src="main.js?v=1.4.1"></script>
   </body>
 </html>
