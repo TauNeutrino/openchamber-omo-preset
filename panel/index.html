@@ -143,8 +143,9 @@
       .picker-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 4px; }
       .picker-title { font-weight: 600; color: var(--oc-fg, #ddd); }
       .picker-filter { font-size: 10px; color: var(--oc-muted, #999); margin-bottom: 4px; }
-      .picker-list { overflow-y: auto; display: flex; flex-direction: column; gap: 0; flex: 1 1 auto; min-height: 0; }
-      .picker-option { text-align: right; border: 0; background: transparent; color: var(--oc-fg, #ddd); padding: 1px 6px; border-radius: 4px; cursor: pointer; font-family: var(--font-mono, monospace); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; box-sizing: border-box; flex: 1 1 auto; min-width: 0; direction: rtl; unicode-bidi: plaintext; }
+      .picker-list { overflow-y: auto; display: flex; flex-direction: column; gap: 0; flex: 1 1 auto; min-height: 0; scrollbar-gutter: stable; }
+      .picker-option { text-align: left; border: 0; background: transparent; color: var(--oc-fg, #ddd); padding: 1px 6px; border-radius: 4px; cursor: pointer; font-family: var(--font-mono, monospace); font-size: 11px; flex: 1 1 auto; min-width: 0; overflow: hidden; box-sizing: border-box; display: flex; align-items: center; }
+      .picker-option-text { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; unicode-bidi: plaintext; text-align: right; }
       .picker-option:hover { background: var(--oc-hover, rgba(127,127,127,0.15)); }
       .picker-option.is-current { color: var(--oc-info, #4a9eff); font-weight: 600; }
       .picker-empty { color: var(--oc-muted, #999); font-size: 11px; padding: 4px 6px; }
@@ -166,7 +167,8 @@
       }
       .picker-row { display: flex; align-items: center; gap: 4px; flex-shrink: 0; flex-wrap: nowrap; }
       .picker-row.is-current-row { background: var(--oc-hover, rgba(127,127,127,0.08)); border-radius: 4px; }
-      .picker-variants { display: inline-flex; gap: 2px; flex-wrap: nowrap; overflow: hidden; }
+      .picker-variants { display: inline-flex; gap: 2px; flex-wrap: nowrap; flex: 0 0 auto; overflow-x: auto; scrollbar-width: none; }
+      .picker-variants::-webkit-scrollbar { display: none; }
       .variant-pill { border: 1px solid var(--oc-border, rgba(127,127,127,0.28)); background: transparent; color: var(--oc-muted, #999); padding: 0 3px; border-radius: 999px; font-size: 9px; cursor: pointer; line-height: 1.5; }
       .variant-pill:hover { color: var(--oc-fg, #ddd); border-color: var(--oc-fg, #ddd); }
       .variant-pill.is-active { background: var(--oc-info, #4a9eff); color: #fff; border-color: var(--oc-info, #4a9eff); }
@@ -428,6 +430,6 @@
   </head>
   <body>
     <div id="root"></div>
-    <script src="main.js?v=1.4.3"></script>
+    <script src="main.js?v=1.4.4"></script>
   </body>
 </html>

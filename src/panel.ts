@@ -679,9 +679,11 @@ const paintReady = (panel: HTMLElement, model: ReadyModel): void => {
     } else {
       for (const m of items) {
         const row = element('div', 'picker-row');
-        const opt = element('button', 'picker-option', m);
+        const opt = element('button', 'picker-option');
         opt.type = 'button';
         opt.title = m;
+        const optText = element('span', 'picker-option-text', m);
+        opt.append(optText);
         if (m === modelPicker.currentModel) {
           opt.classList.add('is-current');
           row.classList.add('is-current-row');
