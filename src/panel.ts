@@ -747,7 +747,8 @@ const paintReady = (panel: HTMLElement, model: ReadyModel): void => {
         }
         opt.addEventListener('click', () => { void applyPickedModel(m); });
         row.append(opt);
-        const variants = modelVariants[m] ?? [];
+        const reported = modelVariants[m] ?? [];
+        const variants = reported.length ? reported : (m.startsWith('opencode/') || m.startsWith('opencode-go/')) ? ['low', 'medium', 'high', 'xhigh', 'max'] : [];
         if (variants.length) {
           const vwrap = element('span', 'picker-variants');
           for (const v of variants) {
