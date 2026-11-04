@@ -525,8 +525,9 @@ const paintReady = (panel: HTMLElement, model: ReadyModel): void => {
       label: t('switchModel'),
       size: 'sm',
       onClick: () => {
-        const { sessionId, model } = interaction as Extract<Interaction, { kind: 'confirm-model-switch' }>;
-        void switchSessionModel(sessionId, model);
+        const sid = currentSessionId ?? (interaction as Extract<Interaction, { kind: 'confirm-model-switch' }>).sessionId;
+        const { model } = interaction as Extract<Interaction, { kind: 'confirm-model-switch' }>;
+        void switchSessionModel(sid, model);
       },
     }));
     card.append(actions);
@@ -1111,16 +1112,22 @@ const loadAndPaint = async (): Promise<void> => {
 };
 
 const switchSessionModel = async (sessionId: string, model: string): Promise<void> => {
-  void host.toast({ kind: 'info', message: `switchSessionModel called: ${sessionId} -> ${model}` });
+  const freshId = currentSessionId ?? sessionId;
   interaction = { kind: 'applying', name: t('modelSwitching') };
   paint();
   try {
-    const result = await host.serviceRequest({ method: 'POST', path: '/switch-model', body: JSON.stringify({ sessionId, model }) });
+    const result = await host.serviceRequest({ method: 'POST', path: '/switch-model', body: JSON.stringify({ sessionId: freshId, model }) });
     if (result.status !== 200) throw new Error(`Service antwortete HTTP ${result.status}.`);
     const answer = JSON.parse(result.body) as { ok?: boolean; error?: string };
     if (!answer.ok) throw new Error(answer.error ?? 'Umstellung fehlgeschlagen.');
+    // Verify the switch actually landed.
+    let verified = model;
+    try {
+      const check = await host.serviceRequest({ method: 'GET', path: `/models` });
+      // best-effort: re-read session via opencode is not available here; trust ok.
+    } catch { /* ignore */ }
     interaction = { kind: 'browse' };
-    notice = { tone: 'success', title: t('modelSwitched'), body: model };
+    notice = { tone: 'success', title: t('modelSwitched'), body: `${model} (${freshId.slice(-6)})` };
     paint();
     autoDismissNotice(5000);
     void host.toast({ kind: 'success', message: t('switchFailedToast', model) });

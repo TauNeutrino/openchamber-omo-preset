@@ -312,10 +312,15 @@ export const resolvePresetView = (
  * touching the file.
  */
 export const resolveWriteTarget = (global: ParsedLayer, project: ParsedLayer | null, name?: string): WriteTarget => {
-  // A preset that only exists in the project layer must be written there,
-  // even when the project does not currently override the active preset.
+  // A preset that only exists in the project layer must be written there.
   if (name && project?.config.hasPresets && project.config.presetNames.includes(name)) {
     return { kind: 'project', path: project.path, availableNames: project.config.presetNames };
+  }
+  // A preset that only exists in the global layer must be written there, even
+  // when the project currently overrides the active preset.
+  if (name && global.config.presetNames.includes(name)
+    && !(project?.config.hasPresets && project.config.presetNames.includes(name))) {
+    return { kind: 'global', path: global.path, availableNames: global.config.presetNames };
   }
   return writeNamesFor(global, project);
 };
