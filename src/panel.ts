@@ -1133,12 +1133,6 @@ const switchSessionModel = async (sessionId: string, model: string): Promise<voi
     paint();
     autoDismissNotice(5000);
     void host.toast({ kind: 'success', message: t('switchFailedToast', model) });
-    // Try to force OpenChamber to re-read the session model.
-    try {
-      const ev = new CustomEvent('openchamber:open-session', { detail: { sessionId: freshId } });
-      window.parent?.dispatchEvent(ev);
-      window.top?.dispatchEvent(ev);
-    } catch { /* ignore */ }
   } catch (error) {
     interaction = { kind: 'browse' };
     notice = { tone: 'error', title: t('modelSwitchFailed'), body: errorText(error) || t('modelSwitchFailedDetail') };
