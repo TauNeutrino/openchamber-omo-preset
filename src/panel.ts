@@ -1133,6 +1133,9 @@ const switchSessionModel = async (sessionId: string, model: string): Promise<voi
     paint();
     autoDismissNotice(5000);
     void host.toast({ kind: 'success', message: t('switchFailedToast', model) });
+    // OpenChamber's UI model indicator is cached; re-open the session so it
+    // reloads the (now changed) model.
+    try { await host.openSession(freshId); } catch { /* ignore */ }
   } catch (error) {
     interaction = { kind: 'browse' };
     notice = { tone: 'error', title: t('modelSwitchFailed'), body: errorText(error) || t('modelSwitchFailedDetail') };
