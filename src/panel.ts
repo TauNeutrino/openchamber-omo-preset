@@ -131,6 +131,7 @@ const regroupSessions = (): void => {
 };
 /** Current OpenCode session, for optional model switching after a preset change. */
 let currentSessionId: string | null = null;
+let currentSessionTitle: string | null = null;
 let currentSessionAgent: string | null = null;
 let openAgent: string | undefined;
 let sessionsToken = 0;
@@ -1127,7 +1128,7 @@ const switchSessionModel = async (sessionId: string, model: string): Promise<voi
       // best-effort: re-read session via opencode is not available here; trust ok.
     } catch { /* ignore */ }
     interaction = { kind: 'browse' };
-    notice = { tone: 'success', title: t('modelSwitched'), body: `${model} (${freshId.slice(-6)})` };
+    notice = { tone: 'success', title: t('modelSwitched'), body: `${model}${currentSessionTitle ? ` (${currentSessionTitle})` : ''}` };
     paint();
     autoDismissNotice(5000);
     void host.toast({ kind: 'success', message: t('switchFailedToast', model) });
@@ -1360,6 +1361,7 @@ host.onDirectory((next) => {
 host.onSession((next) => {
   const prev = currentSessionId;
   currentSessionId = next?.id ?? null;
+  currentSessionTitle = next?.title ?? null;
   currentSessionAgent = next?.agent ?? null;
   if (didMount && prev !== currentSessionId && lastSessionSnapshot) {
     lastSessionSnapshot.sessionId = currentSessionId;
