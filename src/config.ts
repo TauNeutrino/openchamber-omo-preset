@@ -343,6 +343,21 @@ export const sortedPresetNames = (presets: Record<string, PresetAgent[]>): strin
   Object.keys(presets).sort((left, right) => left.localeCompare(right))
 );
 
+export const clearPresetFromText = (raw: string): string => {
+  const before = parseConfigText(raw, t('configLabel'));
+  if (!before.ok) throw new Error(before.error);
+  if (before.config.commentOnly) return raw;
+  const hasBom = raw.startsWith(BOM);
+  const content = hasBom ? raw.slice(1) : raw;
+  const fmt = formattingFor(content);
+  const edits = modify(content, ['preset'], undefined, { formattingOptions: fmt });
+  const next = applyEdits(content, edits);
+  const after = parseConfigText(next, t('resultLabel'));
+  if (!after.ok) throw new Error(`Die Änderung würde die Konfiguration beschädigen: ${after.error}`);
+  if (after.config.preset !== null) throw new Error(t('changeNotVerified'));
+  return hasBom ? `${BOM}${next}` : next;
+};
+
 export const addPresetToText = (
   raw: string, name: string, agents: PresetAgent[],
 ): string => {

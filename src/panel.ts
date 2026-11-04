@@ -12,6 +12,7 @@ import {
   addPresetToText,
   applyAgentModelToText,
   applyPresetToText,
+  clearPresetFromText,
   orchestratorModel,
   parseConfigText,
   resolvePresetView,
@@ -1225,6 +1226,18 @@ const applyPreset = async (name: string): Promise<void> => {
   try {
     const next = applyPresetToText(source.raw, name);
     await host.writeFile(target.path, next);
+    // Wenn auf ein globales Preset gewechselt wird und das Projekt vorher
+    // ein eigenes Preset überschrieben hat, den Projekt-Override entfernen,
+    // damit das globale Preset wirksam wird.
+    if (target.kind === 'global' && layers.project?.config.preset) {
+      try {
+        const projFile = await readConfigFile(layers.project.path);
+        if (projFile.kind === 'file') {
+          const cleared = clearPresetFromText(projFile.raw);
+          await host.writeFile(layers.project.path, cleared);
+        }
+      } catch { /* ignore */ }
+    }
     // Neues Orchestrator-Modell aus dem gewählten Preset ermitteln.
     const newOrchestratorModel = orchestratorModel(model.view.presets, name);
     notice = {
