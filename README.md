@@ -1,7 +1,7 @@
 # oMo Slim Preset Selector
 
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
-[![version](https://img.shields.io/badge/version-1.5.4-blue)](package.json)
+[![version](https://img.shields.io/badge/version-1.5.15)](package.json)
 
 An OpenChamber extension that shows the active **oh-my-opencode-slim** preset and switches it — without the TUI and without editing the config by hand.
 
