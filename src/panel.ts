@@ -1111,6 +1111,7 @@ const loadAndPaint = async (): Promise<void> => {
 };
 
 const switchSessionModel = async (sessionId: string, model: string): Promise<void> => {
+  void host.toast({ kind: 'info', message: `switchSessionModel called: ${sessionId} -> ${model}` });
   interaction = { kind: 'applying', name: t('modelSwitching') };
   paint();
   try {
