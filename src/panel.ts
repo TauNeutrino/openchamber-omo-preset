@@ -110,7 +110,7 @@ const dismissedSessions = new Set<string>();
 let finishedWindowHours = 8;
 let presetEditingEnabled = false;
 /** Last session snapshot as delivered by the host, for regrouping when the window changes. */
-let lastSessionSnapshot: { records: AgentSession[]; projectId: string; directory: string } | null = null;
+let lastSessionSnapshot: { records: AgentSession[]; projectId: string; directory: string; sessionId: string | null } | null = null;
 /** Model picker state when preset editing is enabled. */
 let modelPicker: { agent: string; presetName: string; targetPath: string; currentModel: string; currentVariant: string } | null = null;
 let pickerFilter = '';
@@ -124,7 +124,7 @@ const regroupSessions = (): void => {
   if (!lastSessionSnapshot) return;
   const next = groupAgentSessions(
     lastSessionSnapshot.records, lastSessionSnapshot.projectId, lastSessionSnapshot.directory,
-    Date.now(), finishedWindowHours * 60 * 60 * 1000,
+    Date.now(), finishedWindowHours * 60 * 60 * 1000, lastSessionSnapshot.sessionId,
   );
   agentSessions = next;
   if (openAgent !== undefined && !next.has(openAgent)) openAgent = undefined;
@@ -868,8 +868,8 @@ const watchSessions = (currentDirectory: string | null): void => {
       const unsubscribe = await host.onSessions(projectId, (snapshot) => {
         if (token !== sessionsToken || subscription !== subscriptionToken || subscribedProject !== projectId || snapshot.projectId !== projectId) return;
         const records = snapshot.sessions.filter((session) => session.projectId === projectId);
-        lastSessionSnapshot = { records: records as AgentSession[], projectId, directory: currentDirectory };
-        const next = groupAgentSessions(records as AgentSession[], projectId, currentDirectory, Date.now(), finishedWindowHours * 60 * 60 * 1000);
+        lastSessionSnapshot = { records: records as AgentSession[], projectId, directory: currentDirectory, sessionId: currentSessionId };
+        const next = groupAgentSessions(records as AgentSession[], projectId, currentDirectory, Date.now(), finishedWindowHours * 60 * 60 * 1000, currentSessionId);
         // Avoid stealing focus on unchanged host updates.
         const signature = (groups: Map<string, AgentSessionGroups>): string => JSON.stringify([...groups].map(([name, entries]) => [
           name,
@@ -1350,7 +1350,12 @@ host.onDirectory((next) => {
 });
 
 host.onSession((next) => {
+  const prev = currentSessionId;
   currentSessionId = next?.id ?? null;
   currentSessionAgent = next?.agent ?? null;
+  if (didMount && prev !== currentSessionId && lastSessionSnapshot) {
+    lastSessionSnapshot.sessionId = currentSessionId;
+    regroupSessions();
+  }
   if (didMount && !listOpen && interaction.kind === 'browse') paint();
 });

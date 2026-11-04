@@ -70,16 +70,48 @@ export type AgentSessionGroups = {
   recent: AgentSession[];
 };
 
+export const descendantIds = (currentId: string | null, sessions: AgentSession[]): Set<string> => {
+  const result = new Set<string>();
+  if (!currentId) return result;
+  const childrenByParent = new Map<string, string[]>();
+  for (const s of sessions) {
+    if (s.parentId === null) continue;
+    const list = childrenByParent.get(s.parentId) ?? [];
+    list.push(s.id);
+    childrenByParent.set(s.parentId, list);
+  }
+  const stack = [currentId];
+  const seen = new Set<string>([currentId]);
+  while (stack.length) {
+    const id = stack.pop()!;
+    for (const child of childrenByParent.get(id) ?? []) {
+      if (seen.has(child)) continue;
+      seen.add(child);
+      result.add(child);
+      stack.push(child);
+    }
+  }
+  return result;
+};
+
 export const groupAgentSessions = (
   sessions: AgentSession[], projectId: string, directory: string,
   now: number = Date.now(), windowMs: number = FINISHED_WINDOW_MS,
+  currentSessionId: string | null = null,
 ): Map<string, AgentSessionGroups> => {
   const groups = new Map<string, AgentSessionGroups>();
   const windowStart = now - windowMs;
+  const descendants = descendantIds(currentSessionId, sessions);
+  const allowedParents = new Set<string>();
+  if (currentSessionId) {
+    allowedParents.add(currentSessionId);
+    for (const d of descendants) allowedParents.add(d);
+  }
   for (const session of sessions) {
     if (session.projectId !== projectId || !sameDirectory(session.directory, directory)
       || session.parentId === null || session.archivedAt !== null
       || (typeof session.agent !== 'string' || !session.agent.trim())) continue;
+    if (currentSessionId && !allowedParents.has(session.parentId)) continue;
     if (!isSessionActive(session) && session.updatedAt < windowStart) continue;
     const entry = groups.get(session.agent) ?? { active: [], recent: [] };
     if (isSessionActive(session)) {
