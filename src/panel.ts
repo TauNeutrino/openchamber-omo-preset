@@ -1129,13 +1129,16 @@ const switchSessionModel = async (sessionId: string, model: string): Promise<voi
       // best-effort: re-read session via opencode is not available here; trust ok.
     } catch { /* ignore */ }
     interaction = { kind: 'browse' };
-    notice = { tone: 'success', title: t('modelSwitched'), body: `${model}${currentSessionTitle ? ` (${currentSessionTitle})` : ''}` };
+    notice = { tone: 'success', title: t('modelSwitched'), body: `${model}${currentSessionTitle ? ` (${currentSessionTitle})` : ''} — wirksam ab nächstem Turn` };
     paint();
     autoDismissNotice(5000);
     void host.toast({ kind: 'success', message: t('switchFailedToast', model) });
-    // OpenChamber's UI model indicator is cached; try to force a refresh.
-    setTimeout(() => { void host.openSession(freshId).catch(() => undefined); }, 300);
-    setTimeout(() => { void host.openSession(freshId).catch(() => undefined); }, 1200);
+    // Try to force OpenChamber to re-read the session model.
+    try {
+      const ev = new CustomEvent('openchamber:open-session', { detail: { sessionId: freshId } });
+      window.parent?.dispatchEvent(ev);
+      window.top?.dispatchEvent(ev);
+    } catch { /* ignore */ }
   } catch (error) {
     interaction = { kind: 'browse' };
     notice = { tone: 'error', title: t('modelSwitchFailed'), body: errorText(error) || t('modelSwitchFailedDetail') };
