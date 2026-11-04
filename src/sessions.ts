@@ -49,7 +49,7 @@ export const sameDirectory = (a: string, b: string): boolean => {
 };
 
 /** Activities that mean the session is still doing something. */
-export const ACTIVE_ACTIVITIES = ['running', 'retrying', 'waiting-permission', 'waiting-question'] as const;
+export const ACTIVE_ACTIVITIES = ['idle', 'unknown', 'running', 'retrying', 'waiting-permission', 'waiting-question'] as const;
 
 const isSessionActive = (session: AgentSession): boolean => (
   // Ein gesetztes outcome gewinnt: ein 'running', das kurz vor dem Snapshot

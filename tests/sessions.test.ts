@@ -13,7 +13,6 @@ test('groups only active, unarchived subagents in the current project and direct
     session(), session({ id: 's2', activity: 'retrying' }),
     session({ id: 's3', activity: 'waiting-permission' }),
     session({ id: 's4', activity: 'waiting-question', agent: 'designer' }),
-    session({ id: 'idle', activity: 'idle' }), session({ id: 'unknown', activity: 'unknown' }),
     session({ id: 'parent', parentId: null }), session({ id: 'archived', archivedAt: 1 }),
     session({ id: 'other-dir', directory: '/other' }), session({ id: 'other-project', projectId: 'p2' }),
     session({ id: 'no-agent', agent: undefined }),
@@ -45,8 +44,8 @@ test('keeps named groups when unattributed sessions are present', () => {
 
 test('no active subagents produces no groups', () => {
   const grouped = groupActiveSessions([
-    session({ activity: 'idle' }),
-    session({ activity: 'unknown' }),
+    session({ activity: 'idle', outcome: 'completed' }),
+    session({ activity: 'unknown', outcome: 'completed' }),
     session({ archivedAt: 5 }),
     session({ parentId: null }),
   ], 'p1', '/project');
