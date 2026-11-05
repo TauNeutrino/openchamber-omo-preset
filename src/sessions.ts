@@ -70,9 +70,18 @@ export type AgentSessionGroups = {
   recent: AgentSession[];
 };
 
+// When the current session is itself a subagent, start from its parent so the
+// whole sibling subtree (including the current one) stays visible.
+export const rootSessionId = (currentId: string | null, sessions: AgentSession[]): string | null => {
+  if (!currentId) return null;
+  const current = sessions.find((session) => session.id === currentId);
+  return current?.parentId ?? currentId;
+};
+
 export const descendantIds = (currentId: string | null, sessions: AgentSession[]): Set<string> => {
   const result = new Set<string>();
-  if (!currentId) return result;
+  const rootId = rootSessionId(currentId, sessions);
+  if (!rootId) return result;
   const childrenByParent = new Map<string, string[]>();
   for (const s of sessions) {
     if (s.parentId === null) continue;
@@ -80,8 +89,8 @@ export const descendantIds = (currentId: string | null, sessions: AgentSession[]
     list.push(s.id);
     childrenByParent.set(s.parentId, list);
   }
-  const stack = [currentId];
-  const seen = new Set<string>([currentId]);
+  const stack = [rootId];
+  const seen = new Set<string>([rootId]);
   while (stack.length) {
     const id = stack.pop()!;
     for (const child of childrenByParent.get(id) ?? []) {
@@ -101,10 +110,11 @@ export const groupAgentSessions = (
 ): Map<string, AgentSessionGroups> => {
   const groups = new Map<string, AgentSessionGroups>();
   const windowStart = now - windowMs;
+  const rootId = rootSessionId(currentSessionId, sessions);
   const descendants = descendantIds(currentSessionId, sessions);
   const allowedParents = new Set<string>();
-  if (currentSessionId) {
-    allowedParents.add(currentSessionId);
+  if (rootId) {
+    allowedParents.add(rootId);
     for (const d of descendants) allowedParents.add(d);
   }
   for (const session of sessions) {
@@ -129,9 +139,11 @@ export const groupAgentSessions = (
 
 export const groupActiveSessions = (
   sessions: AgentSession[], projectId: string, directory: string,
+  currentSessionId: string | null = null,
+  now: number = Date.now(), windowMs: number = FINISHED_WINDOW_MS,
 ): Map<string, AgentSession[]> => {
   const groups = new Map<string, AgentSession[]>();
-  for (const [agent, entry] of groupAgentSessions(sessions, projectId, directory)) {
+  for (const [agent, entry] of groupAgentSessions(sessions, projectId, directory, now, windowMs, currentSessionId)) {
     if (entry.active.length) groups.set(agent, entry.active);
   }
   return groups;
