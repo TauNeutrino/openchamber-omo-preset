@@ -58,6 +58,21 @@ npm run type-check
 
 The built files are committed: OpenChamber installs extensions without building them. Bump `version` in `package.json` to ship an update through Git.
 
+## Deploy
+
+1. Bump `version` in `package.json`.
+2. Run `npm run check` (build + IIFE check + manifest check + tests).
+3. Commit everything, including the regenerated `panel/main.js`, `panel/index.html` and `service/main.js`.
+4. Push to `origin/main`.
+5. On the target machine, update the installed copy and rebuild if needed:
+   ```bash
+   cd ~/.config/openchamber/extensions/omo-preset
+   git pull
+   npm run build   # only if node_modules are present; otherwise the committed bundle is used
+   ```
+6. Reload OpenChamber (or the panel) so the new bundle is served.
+
+The installed extension is a plain Git clone of this repository, so `git pull` is enough to bring in a released update.
 ## Permissions
 
 | Permission | Why |
